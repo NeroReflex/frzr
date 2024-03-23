@@ -2,6 +2,72 @@
 
 set -e
 
+# Perform the repair install
+# $1 target (physical) disk
+# $2 frzr_root main subvolume mount path (the one that contains the home subvolume)
+repair_install() {
+	local disk=${1}
+	local frzr_root=${2}
+
+	mkdir -p ${frzr_root}
+	local install_mount=$(fdisk -o Device --list ${disk} | grep "^${disk}.*2$")
+	local boot_efi=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
+	mount ${install_mount} ${frzr_root}
+	mount -t vfat ${boot_efi} ${frzr_root}/boot/
+	rm -rf ${frzr_root}/boot/*
+	bootctl --esp-path=${frzr_root}/boot/ install
+
+	echo "deleting subvolume..."
+	btrfs subvolume delete ${frzr_root}/deployments/* || true
+
+	rm -rf ${frzr_root}/etc/*
+}
+
+# Perform the fresh install
+# $1 target (physical) disk
+# $2 frzr_root main subvolume mount path (the one that contains the home subvolume)
+fresh_install() {
+	local disk=${1}
+	local frzr_root=${2}
+
+	mkdir -p ${frzr_root}
+
+	# create partition table and create and mount the btrfs filesystem
+	parted --script ${disk} \
+	mklabel gpt \
+	mkpart primary fat32 1MiB 512MiB \
+	set 1 esp on \
+	mkpart primary 512MiB 100%
+
+	local part1=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
+	local part2=$(fdisk -o Device --list ${disk} | grep "^${disk}.*2$")
+
+	mkfs.btrfs -L frzr_root -f ${part2}
+
+	# TODO: set the GPT type of the partition as Linux x86_64 sysroot the default does not represents the actual content of the partition
+	# TODO: the correct partition type is "Linux root (x86-64)" (4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709)
+	# TODO: that is very important as it greatly simplify my work to allow easy kernel swaps and will reduce the complexity of the boot
+
+	mount -t btrfs -o nodatacow ${part2} ${frzr_root}
+
+	btrfs subvolume create ${frzr_root}/var
+	btrfs subvolume create ${frzr_root}/home
+
+	mkdir -p ${frzr_root}/home/${USERNAME}
+	chown 1000:1000 ${frzr_root}/home/${USERNAME}
+
+	mkdir ${frzr_root}/boot
+	mkdir -p ${frzr_root}/etc
+	mkdir -p ${frzr_root}/.etc
+
+	# setup boot partition & install bootloader
+	mkfs.vfat ${part1}
+	dosfslabel ${part1} frzr_efi
+	mount -t vfat ${part1} ${frzr_root}/boot/
+	bootctl --esp-path=${frzr_root}/boot/ install
+	parted ${disk} set 1 boot on
+}
+
 if [ $EUID -ne 0 ]; then
 	echo "$(basename $0) must be run as root"
 	exit 1
@@ -41,70 +107,24 @@ fi
 
 
 
-########## Doing a repair install
 
-if [ "${REPAIR}" == true ]; then
 
-	mkdir -p ${MOUNT_PATH}
-	INSTALL_MOUNT=$(fdisk -o Device --list ${DISK} | grep "^${DISK}.*2$")
-	BOOT_EFI=$(fdisk -o Device --list ${DISK} | grep "^${DISK}.*1$")
-	mount ${INSTALL_MOUNT} ${MOUNT_PATH}
-	mount -t vfat ${BOOT_EFI} ${MOUNT_PATH}/boot/
-	rm -rf ${MOUNT_PATH}/boot/*
-	bootctl --esp-path=${MOUNT_PATH}/boot/ install
+if [ "${REPAIR}" == true ]; then ########## Doing a repair install
+	repair_install "${DISK}" "${MOUNT_PATH}"
+else ########## Doing a fresh install
+	if ! (whiptail --yesno "WARNING: $DISK will now be formatted. All data on the disk will be lost. Do you wish to proceed?" 10 50); then
+		echo "installation aborted"
+		exit 1
+	fi
 
-	echo "deleting subvolume..."
-	btrfs subvolume delete ${MOUNT_PATH}/deployments/* || true
-	
-	rm -rf ${MOUNT_PATH}/etc/*
+	USERNAME=user
 
-	exit 0
+	if [ ! -z $1 ]; then
+		USERNAME=$1
+	fi
+
+	fresh_install "${DISK}" "${MOUNT_PATH}"
 fi
 
 
 
-########## Doing a fresh install
-
-if ! (whiptail --yesno "WARNING: $DISK will now be formatted. All data on the disk will be lost. Do you wish to proceed?" 10 50); then
-	echo "installation aborted"
-	exit 1
-fi
-
-USERNAME=user
-
-if [ ! -z $1 ]; then
-	USERNAME=$1
-fi
-
-mkdir -p ${MOUNT_PATH}
-
-# create partition table and create and mount the btrfs filesystem
-parted --script ${DISK} \
-	mklabel gpt \
-	mkpart primary fat32 1MiB 512MiB \
-	set 1 esp on \
-	mkpart primary 512MiB 100%
-
-PART1=$(fdisk -o Device --list ${DISK} | grep "^${DISK}.*1$")
-PART2=$(fdisk -o Device --list ${DISK} | grep "^${DISK}.*2$")
-
-mkfs.btrfs -L frzr_root -f ${PART2}
-mount -t btrfs -o nodatacow ${PART2} ${MOUNT_PATH}
-
-btrfs subvolume create ${MOUNT_PATH}/var
-btrfs subvolume create ${MOUNT_PATH}/home
-
-mkdir -p ${MOUNT_PATH}/home/${USERNAME}
-chown 1000:1000 ${MOUNT_PATH}/home/${USERNAME}
-
-mkdir ${MOUNT_PATH}/boot
-mkdir -p ${MOUNT_PATH}/etc
-mkdir -p ${MOUNT_PATH}/.etc
-
-
-# setup boot partition & install bootloader
-mkfs.vfat ${PART1}
-dosfslabel ${PART1} frzr_efi
-mount -t vfat ${PART1} ${MOUNT_PATH}/boot/
-bootctl --esp-path=${MOUNT_PATH}/boot/ install
-parted ${DISK} set 1 boot on
