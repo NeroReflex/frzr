@@ -16,7 +16,108 @@ write_log() {
 	echo "$msg" | tee --append /tmp/frzr-deploy.log
 }
 
-# get the image url for the given channel
+# Check if the given directory is a btrfs subvolume
+# $1 the directory
+# return 0 if the directory is a subvolume, 1 otherwise
+is_btrfs_subvolume() {
+    local dir=$1
+    [ "$(stat -f --format="%T" "$dir")" == "btrfs" ] || return 1
+    inode="$(stat --format="%i" "$dir")"
+    case "$inode" in
+        2|256)
+            return 0;;
+        *)
+            return 1;;
+    esac
+}
+
+
+# Ensure the subvolume is in RW state
+# PRE=
+# POST=the directory is a btrfs subvolume in RW state
+# $1 the subvolume to be changed
+# stdout "OK" on success, an error string otherwise
+btrfs_subvolume_set_rw() {
+	local dir=${1}
+
+	if is_btrfs_subvolume "$dir"; then
+		local lock_state=$(btrfs property get -fts "$dir")
+		if [[ $lock_state == *"ro=true"* ]]; then
+			btrfs property set -fts ${dir} ro false
+			
+			local lock_state_after_set=$(btrfs property get -fts "$dir")
+			if [[ $lock_state == *"ro=false"* ]]; then
+				echo "OK"
+			else
+				echo "ERROR: the subvolume '$dir' is still readonly"
+			fi
+		else
+			echo "OK"
+		fi
+	else
+		echo "EROR: the given argument '$dir' is not a btrfs subvolume"
+	fi
+}
+
+# Ensure the subvolume is in RO state
+# PRE=
+# POST=the directory is a btrfs subvolume in RO state
+# $1 the subvolume to be changed
+# stdout "OK" on success, an error string otherwise
+btrfs_subvolume_set_ro() {
+	local dir=${1}
+
+	if is_btrfs_subvolume "$dir"; then
+		local lock_state=$(btrfs property get -fts "$dir")
+		if [[ $lock_state == *"ro=false"* ]]; then
+			btrfs property set -fts ${dir} ro true
+			
+			local lock_state_after_set=$(btrfs property get -fts "$dir")
+			if [[ $lock_state == *"ro=true"* ]]; then
+				echo "OK"
+			else
+				echo "ERROR: the subvolume '$dir' is still readonly"
+			fi
+		else
+			echo "OK"
+		fi
+	else
+		echo "EROR: the given argument '$dir' is not a btrfs subvolume"
+	fi
+}
+
+# Install the provided image file into the given deployment directory
+# $1 The path to the image file
+# $2 The path to the deployment directory
+# stdout "OK" on success, an error otherwise
+install_image() {
+	local img_file=${1}
+	local deploy_path=${2}
+
+	if [ -d "${deploy_path}" ]; then
+		if [[ "${IMG_FILE##*.}" == "img" ]]; then
+			btrfs receive --quiet ${DEPLOY_PATH} < ${IMG_FILE}
+			echo "OK"
+		elif [[ "${IMG_FILE##*.}" == "zst" ]]; then
+			zstd -d -c ${IMG_FILE} | btrfs receive --quiet ${DEPLOY_PATH}
+			echo "OK"
+		elif [[ "${IMG_FILE##*.}" == "xz" ]]; then
+			if [[ "${IMG_FILE}" == *".tar.xz" ]]; then
+				tar xfO ${IMG_FILE} | btrfs receive --quiet ${DEPLOY_PATH}
+				echo "OK"
+			else
+				xz -dc ${IMG_FILE} | btrfs receive --quiet ${DEPLOY_PATH}
+				echo "OK"
+			fi
+		else
+			echo "ERROR: Unsupported file format for file '${IMG_FILE}'"
+		fi
+	else
+		echo "ERROR: Deployment path '${deploy_path}' is not a directory"
+	fi
+}
+
+# Get the newest image url for the given channel
 # $1 channel (can be either "stable", "testing" or "unstable")
 # stdout the image url
 get_img_url() {
@@ -130,7 +231,7 @@ get_img_url() {
 # $7 additional arguments to be used in the kernel cmdline
 # $8 entry config file name (mind not inserting an initial /)
 # stdout the configuration to be written to a systemd-boot entry to make the given deployment version bootable
-# return "OK" for success, and error string otherwise"
+# return "OK" for success, an error string otherwise
 generate_systemd_boot_cfg() {
 	local version=${1}
 	local mount_path=${2}
@@ -267,9 +368,12 @@ execute_migrations() {
 
 # Write the systemd-boot entry needed to boot the specified deployment
 # Note: this function can ignore amd-ucode and intel-ucode if those are not found since mkinitcpio will place those
-# in the initramfs and including them on systemd-boot is not deprecated.
+# in the initramfs and including them on systemd-boot is now deprecated.
+# PRE=the deployment image is available to be read from
+# POST=the installed bootloader will automatically start the new deployment at boot
 # $1 the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
-# $2 /boot mount path
+# $2 /efi mount path
+# $3 the path to the deployment to be booted
 # $3 amd_ucode.img path relative to $2/$3/ (mind not inserting an initial /)
 # $4 intel_ucode.img path relative to $2/$3/ (mind not inserting an initial /)
 # $5 vmlinuz-linux path relative to $2/$3/ (mind not inserting an initial /)
@@ -281,22 +385,59 @@ execute_migrations() {
 prepare_efi_partition() {
 	local version=${1}
 	local mount_path=${2}
-	local amd_ucode=${3}
-	local intel_ucode=${4}
-	local vmlinuz_name=${5}
-	local initramfs_name=${6}
-	local additional_arguments=${7}
-	local boot_entry=${8}
+	local deployment_root=${3}
+	local amd_ucode=${4}
+	local intel_ucode=${5}
+	local vmlinuz_name=${6}
+	local initramfs_name=${7}
+	local additional_arguments=${8}
+	local boot_entry=${9}
 
-	local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${mount_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${boot_entry}")
-	echo "systemd-boot install: ${systemd_boot_update_result}"
+	# create /loader/entries in the EFI system partition (if it does not exists already)
+	mkdir -p ${efi_root_path}/loader/entries
 
-	if echo "${systemd_boot_update_result}" | grep -q 'OK'; then
-		echo "default ${boot_entry}" > ${mount_path}/loader/loader.conf
+	if [ -d "${efi_root_path}/loader/entries" ]; then
+		# each deployment will need its own kernel as well as initramfs to boot: place them in a EFI subdirectory
+		mkdir -p ${efi_root_path}/${version}
 
-		echo "OK"
+		if [ -d "${efi_root_path}/${version}" ]; then
+			# Following steps copy kernel, initramfs and ucode to the EFI partition to be used on the next boot
+			cp ${deployment_root}/boot/vmlinuz-linux ${efi_root_path}/${version}/${vmlinuz_name}
+			cp ${deployment_root}/boot/initramfs-linux.img ${efi_root_path}/${version}/${initramfs_name}
+
+			# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
+			local additional_arguments=""
+			if [ -f ${deployment_root}/usr/lib/frzr.d/bootconfig.conf ] ; then
+				additional_arguments="$additional_arguments $(cat ${deployment_root}/usr/lib/frzr.d/bootconfig.conf)"
+			else
+				write_log "$FUNCNAME: File '${deployment_root}/usr/lib/frzr.d/bootconfig.conf' has not been found. No additional boot arguments will be set." 2
+			fi
+
+			local amd_ucode="amd-ucode.img"
+			if [ -e ${deployment_root}/boot/amd-ucode.img ] ; then
+				cp ${deployment_root}/boot/amd-ucode.img ${efi_root_path}/${version}/${amd_ucode}
+			fi
+
+			local intel_ucode="intel-ucode.img"
+			if [ -e ${deployment_root}/boot/intel-ucode.img ] ; then
+				cp ${deployment_root}/boot/intel-ucode.img ${efi_root_path}/${version}/${intel_ucode}
+			fi
+
+			local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${mount_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${boot_entry}")
+			echo "systemd-boot install: ${systemd_boot_update_result}"
+
+			if echo "${systemd_boot_update_result}" | grep -q 'OK'; then
+				echo "default ${boot_entry}" > ${mount_path}/loader/loader.conf
+
+				echo "OK"
+			else
+				echo "${systemd_boot_update_result}"
+			fi
+		else
+			echo "ERROR: could not create path '${efi_root_path}/${version}' system will not be bootable"
+		fi
 	else
-		echo "${systemd_boot_update_result}"
+		echo "ERROR: could not create path '${efi_root_path}/loader/entries' system will not be bootable"
 	fi
 }
 
@@ -472,83 +613,68 @@ main() {
 			whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
 		fi
 
-		# TODO: see the additional image types branch and put this on a function of its own
-		if [[ "${IMG_FILE##*.}" == "img" ]]; then
-			btrfs receive --quiet ${DEPLOY_PATH} < ${IMG_FILE}
-		else
-			tar xfO ${IMG_FILE} | btrfs receive --quiet ${DEPLOY_PATH}
-		fi
+		# Write the deployment image to disk
+		local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
+		if echo "${set_subvol_rw}" | grep -q 'OK'; then
+			local vmlinuz_name="vmlinuz-linux"
+			local initramfs_name="initramfs-linux.img"
 
-		local vmlinuz_name="vmlinuz-linux"
-		local initramfs_name="initramfs-linux.img"
+			# this is the place where the EFI partition is mounted during the deployment procedure
+			local efi_root_path="${MOUNT_PATH}/boot"
+			
+			# Migrations should be able to modify the new installed image: set ${SUBVOL} R/W
+			local set_subvol_rw=$(btrfs_subvolume_set_rw "${SUBVOL}")
+			echo "Deployment Set RW: ${set_subvol_rw}"
+			if echo "${set_subvol_rw}" | grep -q 'OK'; then
+				# Execute and migrations available in the image to be deployed
+				execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}"
 
-		# this is the place where the EFI partition is mounted during the deployment procedure
-		local efi_root_path="${MOUNT_PATH}/boot"
-		
-		# each deployment will need its own kernel as well as initramfs to boot: place them in a EFI subdirectory
-		mkdir -p ${efi_root_path}/${NAME}
+				# Export variables to be used by child processes for frzr-tweaks and frzr-initramfs
+				export MOUNT_PATH
+				export SUBVOL
+				export NAME
+				# TODO: remove the above when said tools can accept parameters
 
-		# Following steps copy kernel, initramfs and ucode to the EFI partition to be used on the next boot
-		# TODO: move them in a function, and execute them after regenerating the initramfs and apply device-quirks
-		# TODO: bonus point if these are run AFTER setting the deployment volume back in read-only state
-		cp ${SUBVOL}/boot/vmlinuz-linux ${efi_root_path}/${NAME}/${vmlinuz_name}
-		cp ${SUBVOL}/boot/initramfs-linux.img ${efi_root_path}/${NAME}/${initramfs_name}
+				# Check if the FIRMWARE_OVERRIDE variable is set by the install media, if so enable firmware overrides
+				if [ -n "${FIRMWARE_OVERRIDE}" ]; then
+					echo "export USE_FIRMWARE_OVERRIDES=1" > ${MOUNT_PATH}/etc/device-quirks.conf
+				fi
 
-		local amd_ucode="amd-ucode.img"
-		if [ -e ${SUBVOL}/boot/amd-ucode.img ] ; then
-			cp ${SUBVOL}/boot/amd-ucode.img ${efi_root_path}/${NAME}/${amd_ucode}
-		fi
+				# Run frzr-tweaks to execute the device-quirks to be supplied by the deployed images
+				frzr-tweaks # TODO: pass the root as an argument and in the script default to "/"
 
-		local intel_ucode="intel-ucode.img"
-		if [ -e ${SUBVOL}/boot/intel-ucode.img ] ; then
-			cp ${SUBVOL}/boot/intel-ucode.img ${efi_root_path}/${NAME}/${intel_ucode}
-		fi
+				# Run frzr-initramfs to create mkinicpio.conf and build an initramfs
+				frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
 
-		local additional_arguments=""
-		if [ -f ${SUBVOL}/usr/lib/frzr.d/bootconfig.conf ] ; then
-			additional_arguments="$additional_arguments $(cat ${SUBVOL}/usr/lib/frzr.d/bootconfig.conf)"
-		else
-			write_log "$FUNCNAME: File '${SUBVOL}/usr/lib/frzr.d/bootconfig.conf' has not been found" 2
-		fi
+				# Migrations have been executed, frzr-tweaks and frzr-initramfs have been run: set the deployment subvolume back to being RO
+				local set_subvol_ro=$(btrfs_subvolume_set_ro "${SUBVOL}")
+				echo "Deployment Set RO: ${set_subvol_ro}"
+				if echo "${set_subvol_ro}" | grep -q 'OK'; then
+					# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
+					local efi_update_result=$(prepare_efi_partition "${NAME}" "${efi_root_path}" ${SUBVOL} "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${deploy_systemd_boot_cfg}")
+					echo "EFI update: ${efi_update_result}"
+					if echo "${efi_update_result}" | grep -q 'OK'; then
+						rm -f ${MOUNT_PATH}/*.img.*
 
-		# TODO: migrations should be able to modify the new installed image: set ${SUBVOL} R/W
+						rm -rf /var/lib/pacman # undo frzr-unlock
 
-		# Execute and migrations available in the image to be deployed
-		execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}"
+						echo "deployment complete; restart to boot into ${NAME}"
 
-		# Export variables to be used by child processes for frzr-tweaks and frzr-initramfs
-		export MOUNT_PATH
-		export SUBVOL
-		export NAME
-		# TODO: remove the above when said tools can accept parameters
-
-		# Check if the FIRMWARE_OVERRIDE variable is set by the install media, if so enable firmware overrides
-		if [ -n "${FIRMWARE_OVERRIDE}" ]; then
-			echo "export USE_FIRMWARE_OVERRIDES=1" > ${MOUNT_PATH}/etc/device-quirks.conf
-		fi
-
-		# Run frzr-tweaks to execute the device-quirks to be supplied by the deployed images
-		frzr-tweaks # TODO: pass the root as an argument and in the script default to "/"
-
-		# Run frzr-initramfs to create mkinicpio.conf and build an initramfs
-		frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
-
-		# TODO: migrations have been executed, frzr-tweaks and frzr-initramfs have been run: set the deployment subvolume back to being R/O
-
-
-		# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-		local efi_update_result=$(prepare_efi_partition "${NAME}" "${efi_root_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${deploy_systemd_boot_cfg}")
-		echo "EFI update: ${efi_update_result}"
-		if echo "${efi_update_result}" | grep -q 'OK'; then
-			rm -f ${MOUNT_PATH}/*.img.*
-
-			rm -rf /var/lib/pacman # undo frzr-unlock
-
-			echo "deployment complete; restart to boot into ${NAME}"
-
-			umount -R -l ${MOUNT_PATH} # TODO: move this in frzr-deploy and umount without -l -R MOUNT_PATH if it was not mounted when the update started
-		else
-			echo "deployment failed; could not update the EFI partition"
+						umount -R -l ${MOUNT_PATH} # TODO: move this in frzr-deploy and umount without -l -R MOUNT_PATH if it was not mounted when the update started
+					else # the bootloader could not be updated
+						echo "deployment failed; could not update the EFI partition"
+						exit 1
+					fi
+				else # Image could not be set back to ro: this wouldn't be a problem, but indicates a greater problem and it's not safe to boot to it
+					echo "deployment failed; could not set the new image back in read-only state"
+					exit 1
+				fi
+			else # Image could not be unlocked
+				echo "deployment failed; could not set the new image in read-write state"
+				exit 1
+			fi
+		else # No image written
+			echo "deployment failed; could not write the new image to disk"
 			exit 1
 		fi
 	else # No UEFI found

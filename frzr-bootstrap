@@ -32,21 +32,19 @@ fresh_install() {
 
 	mkdir -p ${frzr_root}
 
-	# create partition table and create and mount the btrfs filesystem
+	# create the GPT partition table and set the correct GPT type for each partition
 	parted --script ${disk} \
 	mklabel gpt \
 	mkpart primary fat32 1MiB 512MiB \
+	type 1 "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" \
 	set 1 esp on \
-	mkpart primary 512MiB 100%
+	mkpart primary 512MiB 100% \
+	type 2 "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709"
 
 	local part1=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
 	local part2=$(fdisk -o Device --list ${disk} | grep "^${disk}.*2$")
 
 	mkfs.btrfs -L frzr_root -f ${part2}
-
-	# TODO: set the GPT type of the partition as Linux x86_64 sysroot the default does not represents the actual content of the partition
-	# TODO: the correct partition type is "Linux root (x86-64)" (4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709)
-	# TODO: that is very important as it greatly simplify my work to allow easy kernel swaps and will reduce the complexity of the boot
 
 	mount -t btrfs -o nodatacow ${part2} ${frzr_root}
 
@@ -65,7 +63,6 @@ fresh_install() {
 	dosfslabel ${part1} frzr_efi
 	mount -t vfat ${part1} ${frzr_root}/boot/
 	bootctl --esp-path=${frzr_root}/boot/ install
-	parted ${disk} set 1 boot on
 }
 
 if [ $EUID -ne 0 ]; then
