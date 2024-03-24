@@ -9,7 +9,9 @@ if [ $EUID -ne 0 ]; then
 	exit 1
 fi
 
-# Each function used should have a tracker variable to go with it to be exported later into a JSON for external tools and utilities to monitor behavior
+# Each function used should have a tracker variable to go with it to be exported later into a JSON for external tools and utilities to monitor behavior.
+# When the function completes without errors these values should be set to 1.
+# After completing the function catch the result. EX: RESULT=$? fetch_img_url_func=$RESULT
 fetch_img_url_func=0
 generate_systemd_boot_cfg_func=0
 get_deployment_to_delete_func=0
@@ -18,8 +20,21 @@ check_uefi_func=0
 execute_migrations_func=0
 prepare_efi_partition_func=0
 
+# Check for exported variables provided by an installer script
+if [ -z $TARGET ]; then
+   TARGET="" # Set to the target deployment channel. This should only be set by the installer script
+fi
+
+if [ -z $LOCAL_INSTALL ]; then
+   LOCAL_INSTALL=0 # Set to 1 to perform a local media install. This should be set by the installer script
+fi
+
+if [ -z $SHOW_UI ]; then
+   SHOW_UI=0 # Show the whiptail UI. This is used to show the installation and extraction progress. This should be set only by the installer script.
+fi
+
 # Define all public variables to be used here and in all sourced scripts
-REPAIR=0 # Set to 1 if you want to do a repair install
+REPAIR_INSTALL=0 # Set to 1 if you want to do a repair install. This should be set by frzr-bootstrap later if an existing install is found.
 NAME="" # Name of the OS to be deployed
 MOUNT_PATH="" # This is set as /tmp/frzr_root/ in the installer and /frzr_root during upgrades
 SUBVOL=""
@@ -53,7 +68,10 @@ EOF
     cat <<EOF
     },
     "Variables": {
-        "Repair": "$REPAIR",
+        "Target": "$TARGET",
+        "Local Install": "$LOCAL_INSTALL",
+        "Show UI": "$SHOW_UI",
+        "Repair Install": "$REPAIR_INSTALL",
         "Name": "$NAME",
         "Mount Path": "$MOUNT_PATH",
         "SUBVOL": "$SUBVOL",
@@ -101,13 +119,16 @@ frzr set-channel [Set the update channel stable/testing/unstable]
 frzr version [Get the current version of the deployed OS]
 frzr build-initramfs [Build the initramfs for the kernel]
 frzr configure-tweaks [Configure system specific quirks]
-frzr configure-bootstrap [Format and configure a drive to be used with FRZR]"
+frzr bootstrap [Format and configure a drive to be used with FRZR]"
 elif [ $function == "bootstrap" ]; then
     echo "bootstrap"
-    #source frzr-bootstrap $arg1
+    #source frzr-bootstrap $arg1 # frzr-bootstrap
 elif [ $function == "upgrade" ]; then
     echo "frzr-deploy"
-    #source frzr-deploy $arg1
+    #source frzr-deploy $TARGET
+elif [ $function == "version" ]; then
+    echo "version"
+    #source frzr-deploy $arg1 $arg2
 elif [ $function == "version" ]; then
     echo "frzr-release"
     #source frzr-release
