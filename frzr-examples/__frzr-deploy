@@ -1,0 +1,46 @@
+run() {
+echo "Initializing frzr-deploy simulation"
+fetch_img_url
+generate_systemd_boot_cfg
+get_deployment_to_delete
+get_next_boot_deployment
+check_uefi
+execute_migrations
+prepare_efi_partition
+create_log
+}
+
+fetch_img_url() {
+   fetch_img_url_func=$?
+   echo "Fetching URL $(frzr_check $fetch_img_url_func)"
+}
+generate_systemd_boot_cfg() {
+   generate_systemd_boot_cfg=$?
+   echo "Generating Systemd boot config $(frzr_check $generate_systemd_boot_cfg)"
+}
+get_deployment_to_delete() {
+   generate_systemd_boot_cfg_func=$?
+   echo "Determine deployments to remove $(frzr_check $generate_systemd_boot_cfg_func)"
+}
+get_next_boot_deployment() {
+   get_next_boot_deployment_func=$?
+   echo "Checking the next boot deployment $(frzr_check $get_next_boot_deployment_func)"
+}
+check_uefi() {
+   check_uefi_func=$?
+   echo "Checking UEFI Status $(frzr_check $check_uefi_func)"
+}
+execute_migrations() {
+   execute_migrations_func=$?
+   echo "Executing migration scripts $(frzr_check $execute_migrations_func)"
+}
+prepare_efi_partition() {
+   prepare_efi_partition_func=$?
+   echo "Preparing the EFI partition $(frzr_check $prepare_efi_partition_func)"
+}
+
+create_log(){
+   write_json_log
+}
+
+run
