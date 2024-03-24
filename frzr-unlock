@@ -29,21 +29,9 @@ fi
 
 DEPLOYMENT=$(frzr-release)
 
-# set to read-write mode
-mount -o remount,rw /
-btrfs property set -fts /frzr_root/deployments/${DEPLOYMENT} ro false
-sed -i -e 's/,ro,/,rw,/' /etc/fstab
+# set rootfs btrfs subvolume to read-write mode
+btrfs property set -fts / ro false
 systemctl daemon-reload
-
-
-# move kernel/initrd and ucode to standard location
-BOOT_CFG="${MOUNT_PATH}/boot/loader/entries/frzr.conf"
-if [ -f "${BOOT_CFG}" ]; then
-	# guard is for compatibility with systems still using syslinux during the transition to systemd-boot
-	cp ${MOUNT_PATH}/boot/${DEPLOYMENT}/* ${MOUNT_PATH}/boot/
-	sed -i ${BOOT_CFG} -e s,/${DEPLOYMENT}/,/,g
-fi
-
 
 # copy package database and refresh
 if [ -d /usr/var/lib/pacman/local ] && [ ! -d /var/lib/pacman/local ]; then

@@ -17,10 +17,11 @@ repair_install() {
 	rm -rf ${frzr_root}/boot/*
 	bootctl --esp-path=${frzr_root}/boot/ install
 
-	echo "deleting subvolume..."
+	echo "deleting subvolume(s)..."
 	btrfs subvolume delete ${frzr_root}/deployments/* || true
 
 	rm -rf ${frzr_root}/etc/*
+	rm -rf ${frzr_root}/.etc/*
 }
 
 # Perform the fresh install
@@ -32,41 +33,88 @@ fresh_install() {
 
 	mkdir -p ${frzr_root}
 
+	if [ ! -z ${SWAP_GIB:-} ];
+		declare -i SWAP_GIB=1
+	fi
+
+	if [ ! -z ${ROOT_GIB:-} ];
+		declare -i ROOT_GIB=8
+	fi
+
+	if [ ! -z ${VAR_GIB:-} ];
+		declare -i VAR_GIB=4
+	fi
+
+	#declare -i ROOT_START=
+	declare -i ROOT_END=${ROOT_GIB}
+	declare -i SWAP_START=${ROOT_END}
+	declare -i SWAP_END=${SWAP_GIB}+${SWAP_START}
+	declare -i VAR_START=${SWAP_END}
+	declare -i VAR_END=${VAR_START}+${VAR_GIB}
+	declare -i HOME_START=${ROOT_END}
+
 	# create the GPT partition table and set the correct GPT type for each partition
 	parted --script ${disk} \
 	mklabel gpt \
 	mkpart primary fat32 1MiB 512MiB \
 	type 1 "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" \
 	set 1 esp on \
-	mkpart primary 512MiB 100% \
-	type 2 "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709"
+	mkpart primary 512MiB ${ROOT_END}.5GiB \
+	type 2 "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709" \
+	mkpart primary linux-swap ${SWAP_START}.5 ${SWAP_END}.5GiB \
+	type 3 "0657fd6d-a4ab-43c4-84e5-0933c84b4f4f" \
+	mkpart primary ${VAR_START}.5GiB ${VAR_END}.5GiB \
+	type 4 "4d21b016-b534-45c2-a9fb-5c16e091fd2d" \
+	mkpart primary ${HOME_START}.5GiB 100% \
+	type 5 "933ac7e1-2eb4-4f13-b844-0e14e2aef915" \
 
-	local part1=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
-	local part2=$(fdisk -o Device --list ${disk} | grep "^${disk}.*2$")
+	local efi_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
+	local root_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*2$")
+	local swap_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*3$")
+	local var_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*4$")
+	local home_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*5$")
 
 	# this creates the subvolid 5
-	mkfs.btrfs -L frzr_root -f ${part2}
+	mkfs.btrfs -L frzr_root -f ${root_part}
+	local root_uuid=$(blkid -s UUID -o value "${root_part}")
 
-	mount -t btrfs -o nodatacow ${part2} ${frzr_root}
+	# mount the rootfs so that the install can be performed
+	mount ${root_part} ${frzr_root}
+	mkdir ${frzr_root}/efi
+	mkdir ${frzr_root}/home
+	mkdir ${frzr_root}/var
+
+	# TODO: if a minimal/recovery system has to installed in the main partition here is the place to do just that.
 
 	# this creates the subvolid 256
-	btrfs subvolume create ${frzr_root}/var
+	mkfs.btrfs -L frzr_var -f ${var_part}
+	mount ${var_part} ${frzr_root}/var
+	local var_uuid=$(blkid -s UUID -o value "${var_part}")
 
-	# this creates the subvolid 257
-	btrfs subvolume create ${frzr_root}/home
+	# setup home partition
+	mkfs.btrfs -L frzr_home -f ${home_part}
+	mount -t btrfs -o nodatacow ${home_part} ${frzr_root}/home
+	local home_uuid=$(blkid -s UUID -o value "${home_part}")
 
+	# create folder for the gamer user
 	mkdir -p ${frzr_root}/home/${USERNAME}
 	chown 1000:1000 ${frzr_root}/home/${USERNAME}
 
-	mkdir ${frzr_root}/boot
-	mkdir -p ${frzr_root}/etc
-	mkdir -p ${frzr_root}/.etc
+	# setup the swap partition
+	mkswap ${swap_part}
+	local swap_uuid=$(blkid -s UUID -o value "${swap_part}")
 
 	# setup boot partition & install bootloader
-	mkfs.vfat ${part1}
-	dosfslabel ${part1} frzr_efi
-	mount -t vfat ${part1} ${frzr_root}/boot/
-	bootctl --esp-path=${frzr_root}/boot/ install
+	mkfs.vfat ${efi_part}
+	dosfslabel ${efi_part} frzr_efi
+	mount -t vfat ${efi_part} ${frzr_root}/efi/
+	bootctl --esp-path=${frzr_root}/efi/ install
+
+	# Write partition UUIDs into a file
+	echo "${swap_uuid}"	> ${frzr_root}/swap_uuid
+	echo "${root_uuid}"	> ${frzr_root}/root_uuid
+	echo "${var_uuid}"	> ${frzr_root}/var_uuid
+	echo "${home_uuid}"	> ${frzr_root}/home_uuid
 }
 
 if [ $EUID -ne 0 ]; then

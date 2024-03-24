@@ -630,6 +630,24 @@ main() {
 						# Execute and migrations available in the image to be deployed
 						execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}"
 
+						# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
+						if [ -f "${MOUNT_PATH}/root_uuid" ]; then
+							local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
+							sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
+						else
+							local disk=$(blkid -L frzr_root)
+							local root_uuid=$(blkid -s UUID -o value "${disk}p2")
+							sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
+						fi
+
+						# TODO: move /etc to a subvolume
+
+						# TODO: move /usr/modules/* to a frzr_root/subvolume and add a mount in x-initrd in /etc/fstab
+
+						# TODO: remove every file from deployment/var (moving them somewhere else)
+
+						# TODO: remove everything from deployment/home (so that the new partition or btrfs subvolume will get mounted)
+
 						# Export variables to be used by child processes for frzr-tweaks and frzr-initramfs
 						export MOUNT_PATH
 						export SUBVOL
@@ -642,10 +660,10 @@ main() {
 						fi
 
 						# Run frzr-tweaks to execute the device-quirks to be supplied by the deployed images
-						frzr-tweaks # TODO: pass the root as an argument and in the script default to "/"
+						#frzr-tweaks # TODO: pass the root as an argument and in the script default to "/"
 
 						# Run frzr-initramfs to create mkinicpio.conf and build an initramfs
-						frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
+						#frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
 
 						# Migrations have been executed, frzr-tweaks and frzr-initramfs have been run: set the deployment subvolume back to being RO
 						local set_subvol_ro=$(btrfs_subvolume_set_ro "${SUBVOL}")
@@ -710,7 +728,6 @@ main() {
 
 					# umount the frzr_root subvolume
 					umount -l ${MOUNT_PATH}
-					
 					
 					exit 1
 				fi
