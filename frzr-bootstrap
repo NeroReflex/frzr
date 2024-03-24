@@ -44,11 +44,15 @@ fresh_install() {
 	local part1=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
 	local part2=$(fdisk -o Device --list ${disk} | grep "^${disk}.*2$")
 
+	# this creates the subvolid 5
 	mkfs.btrfs -L frzr_root -f ${part2}
 
 	mount -t btrfs -o nodatacow ${part2} ${frzr_root}
 
+	# this creates the subvolid 256
 	btrfs subvolume create ${frzr_root}/var
+
+	# this creates the subvolid 257
 	btrfs subvolume create ${frzr_root}/home
 
 	mkdir -p ${frzr_root}/home/${USERNAME}
