@@ -45,13 +45,15 @@ fresh_install() {
 		declare -i VAR_GIB=4
 	fi
 
+	# TODO: the user can set 0 size: handle accordingly. whatever partition gets skipped ends up in the root
+
 	#declare -i ROOT_START=
 	declare -i ROOT_END=${ROOT_GIB}
 	declare -i SWAP_START=${ROOT_END}
 	declare -i SWAP_END=${SWAP_GIB}+${SWAP_START}
-	declare -i VAR_START=${SWAP_END}
-	declare -i VAR_END=${VAR_START}+${VAR_GIB}
-	declare -i HOME_START=${ROOT_END}
+	#declare -i VAR_START=${SWAP_END}
+	#declare -i VAR_END=${VAR_START}+${VAR_GIB}
+	declare -i HOME_START=${SWAP_END}
 
 	# create the GPT partition table and set the correct GPT type for each partition
 	parted --script ${disk} \
@@ -63,16 +65,19 @@ fresh_install() {
 	type 2 "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709" \
 	mkpart primary linux-swap ${SWAP_START}.5 ${SWAP_END}.5GiB \
 	type 3 "0657fd6d-a4ab-43c4-84e5-0933c84b4f4f" \
-	mkpart primary ${VAR_START}.5GiB ${VAR_END}.5GiB \
-	type 4 "4d21b016-b534-45c2-a9fb-5c16e091fd2d" \
+	
 	mkpart primary ${HOME_START}.5GiB 100% \
 	type 5 "933ac7e1-2eb4-4f13-b844-0e14e2aef915" \
+
+	# TODO: put var in a per-deployment subvolume
+	# mkpart primary ${VAR_START}.5GiB ${VAR_END}.5GiB \
+	# type 4 "4d21b016-b534-45c2-a9fb-5c16e091fd2d" \
 
 	local efi_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
 	local root_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*2$")
 	local swap_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*3$")
-	local var_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*4$")
-	local home_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*5$")
+	#local var_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*4$")
+	local home_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*4$")
 
 	# this creates the subvolid 5
 	mkfs.btrfs -L frzr_root -f ${root_part}
