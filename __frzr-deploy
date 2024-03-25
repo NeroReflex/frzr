@@ -644,7 +644,7 @@ main() {
 
 						# TODO: move /usr/modules/* to a frzr_root/subvolume and add a mount in x-initrd in /etc/fstab
 
-						# TODO: remove every file from deployment/var (moving them somewhere else)
+						# TODO: move /var to a submodule. handle pacman dir
 
 						# TODO: remove everything from deployment/home (so that the new partition or btrfs subvolume will get mounted)
 
@@ -747,7 +747,7 @@ main() {
 		echo "deployment failed; system not booted with UEFI: disable MBR (or CSM) boot in your motherboard setup"
 
 		exit 1
-	fi 
+	fi
 }
 
 if [ "$0" = "$BASH_SOURCE" ] ; then
