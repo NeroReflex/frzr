@@ -1,3 +1,4 @@
+#!/bin/bash
 run() {
 echo "Initializing frzr-deploy simulation"
 fetch_img_url
@@ -10,9 +11,60 @@ prepare_efi_partition
 create_log
 }
 
-fetch_img_url() {
-   fetch_img_url_func=$?
-   echo "Fetching URL $(frzr_check $fetch_img_url_func)"
+RUNNING=true
+STATE="BEGIN"
+NAME="your_system_name"
+
+while $RUNNING; do
+  case "$STATE" in
+    "BEGIN")
+      echo "Checking for the latest version of $NAME"
+      echo "Found $NAME"
+      STATE="DOWNLOAD"
+      ;;
+    "DOWNLOAD")
+      echo "Downloading System Image"
+      STATE="CHECKSUM"
+      ;;
+    "CHECKSUM")
+      echo "Verifying downloaded image sha256"
+      STATE="EXTRACT"
+      ;;
+    "EXTRACT")
+      echo "Extracting System Image"
+      STATE="INSTALL"
+      ;;
+    "INSTALL")
+      echo "Installing $NAME"
+      STATE="VERIFY"
+      ;;
+    "VERIFY")
+      echo "Verifying installation"
+      STATE="CLEANUP"
+      ;;
+    "CLEANUP")
+      echo "Cleaning Up"
+      STATE="SUCCESS"
+      ;;
+    "SUCCESS")
+      echo "Successfully installed $NAME"
+      RUNNING=false
+      ;;
+    "FAIL")
+      echo "The installation was not successful"
+      RUNNING=false
+      ;;
+    *)
+      echo "Something went terribly wrong"
+      echo $STATE
+      RUNNING=false
+      ;;
+  esac
+done
+
+
+fetch_img_url()}
+   fetch_img_url_func=$/
 }
 generate_systemd_boot_cfg() {
    generate_systemd_boot_cfg=$?
@@ -40,7 +92,7 @@ prepare_efi_partition() {
 }
 
 create_log(){
-   write_json_log
+   write_tracker_file
 }
 
 run

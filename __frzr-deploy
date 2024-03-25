@@ -447,6 +447,77 @@ main() {
 		exit 1
 	fi
 
+	#TODO Utilize the state machine to manage the individual proccesses to send signals to external monitors
+	## Signals
+	#TASK_STATE="" # The current state of the state machine
+	#TASK_MSG="" # TASK_MSG will be read by external tools. EX TASK_MSG="Preparing user directory"
+	#TASK_TRACKER=0 # TASK_TRACKER will be used to signal back that the current TASK_MSG in queue is handled or not 0 = Pending 1 = Completed
+	#TASK_ERROR=0 # Signal to let listeners know that the task had an error.
+	#TASK_ERROR_MSG="" # Error message. EX: "Unexpected I/O errors found during write"
+	#TASK_WARNING=0 # Signal to let listeners know there is a warning
+	#TASK_WARNING_MSG="" # Warning message. EX: "BTRFS filesystem was supposed to be locked, but it was already unlocked. Continuing.."
+
+	local RUNNING=false
+	local STATE="BEGIN"
+
+	while $RUNNING; do
+	  case "$STATE" in
+	    "BEGIN")
+	      TASK_STATE="BEGIN"
+	      # Fetch information from the repo etc.
+	      STATE="CHECK"
+	      ;;
+	    "CHECK")
+	      TASK_STATE="BEGIN"
+	      # Check system status for compatbility. Did we boot with UEFI?
+	      STATE="DOWNLOAD"
+	      ;;
+	    "DOWNLOAD")
+	      TASK_STATE="DOWNLOAD"
+	      # Download checksums and system image
+	      STATE="CHECKSUM"
+	      ;;
+	    "CHECKSUM")
+	      TASK_STATE="CHECKSUM"
+	      # Verify checksums of downloaded files
+	      STATE="EXTRACT"
+	      ;;
+	    "EXTRACT")
+	      TASK_STATE="EXTRACT"
+	      # Extract tar of system image
+	      STATE="INSTALL"
+	      ;;
+	    "INSTALL")
+	      TASK_STATE="INSTALL"
+	      # Use BTRFS receive to install the image
+	      STATE="VERIFY"
+	      ;;
+	    "VERIFY")
+	      TASK_STATE="VERIFY"
+	      # Verify the system installation status
+	      STATE="CLEANUP"
+	      ;;
+	    "CLEANUP")
+	      TASK_STATE="CLEANUP"
+	      # Delete the downloaded system img etc.
+	      STATE="SUCCESS"
+	      ;;
+	    "SUCCESS")
+	      TASK_STATE="SUCCESS"
+	      RUNNING=false
+	      ;;
+	    "FAIL")
+	      TASK_STATE="FAIL"
+	      RUNNING=false
+	      ;;
+	    *)
+	      TASK_STATE="UNKNOWN_ERROR"
+	      echo "Something went terribly wrong"
+	      RUNNING=false
+	      ;;
+	  esac
+	done
+
 	FRZR_CHECK_UPDATE=0
 	FRZR_STEAM_PROGRESS=0
 	FRZR_SOURCE=""

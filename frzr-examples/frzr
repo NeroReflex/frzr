@@ -1,22 +1,18 @@
 #! /bin/bash
 
+
 set -Ee
-trap frzr_status SIGINT SIGTERM ERR EXIT
-set -o pipefail
+# Tracker file directory
+TRACKER_FILE_DIR="/tmp/"
 
-# Logging variables
-JSON_LOG_DIR="/tmp/"
-
-# Each function used should have a tracker variable to go with it to be exported later into a JSON for external tools and utilities to monitor behavior.
-# When the function completes without errors these values should be set to 1.
-# After completing the function catch the result. EX: RESULT=$? fetch_img_url_func=$RESULT
-fetch_img_url_func=0
-generate_systemd_boot_cfg_func=0
-get_deployment_to_delete_func=0
-get_next_boot_deployment_func=0
-check_uefi_func=0
-execute_migrations_func=0
-prepare_efi_partition_func=0
+# Signals
+TASK_STATE=""
+TASK_MSG="" # TASK_MSG will be read by external tools. EX TASK_MSG="Preparing user directory"
+TASK_TRACKER=0 # TASK_TRACKER will be used to signal back that the current TASK_MSG in queue is handled or not 0 = Pending 1 = Completed
+TASK_ERROR=0 # Signal to let listeners know that the task had an error.
+TASK_ERROR_MSG="" # Error message. EX: "Unexpected I/O errors found during write"
+TASK_WARNING=0 # Signal to let listeners know there is a warning
+TASK_WARNING_MSG="" # Warning message. EX: "BTRFS filesystem was supposed to be locked, but it was already unlocked. Continuing.."
 
 # Check for exported variables provided by an installer script
 if [ -z $TARGET ]; then
@@ -38,8 +34,6 @@ MOUNT_PATH="" # This is set as /tmp/frzr_root/ in the installer and /frzr_root d
 SUBVOL=""
 DEPLOY_PATH="" # ${MOUNT_PATH}/deployments
 FRZR_CHECK_UPDATE=0
-FRZR_STEAM_PROGRESS=0
-FRZR_SOURCE=""
 FRZR_PARAMS=""
 FILE_NAME="" # The file name downloaded from the repo
 IMG_NAME="" # Path to the downloaded image to be deployed. It gets set by "${MOUNT_PATH}/${FILE_NAME}"
@@ -47,50 +41,45 @@ BASE_URL=""
 REPO="" # Github repo
 CHANNEL="" # The target channel to download the image from. Stable/Testing/Unstable
 RELEASES_URL=""
-CHECKSUM="" # Expected checksum value of downloaded file
-CHECKSUM2="" # Actual checksum of the file downloaded
+EXPECTED_CHECKSUM="" # Expected checksum value of downloaded file
+ACTUAL_CHECKSUM="" # Actual checksum of the file downloaded
 
-# If there are any errors at any time during execution of FRZR the frzr_status() function will be ran before exiting.
 frzr_status() {
-    # Output Function Tracker variables as JSON object
-    echo "Generating execution report"
+    # Output frzr status tracker using the JSON format
     cat <<EOF
 {
-    "Functions": {
-        "Fetch_Img_Url_Status": "$fetch_img_url_func",
-        "generate_systemd_boot_cfg_status": "$generate_systemd_boot_cfg_func",
-        "get_next_boot_deployment_status": "$get_next_boot_deployment_func",
-        "check_uefi_status": "$check_uefi_func",
-        "execute_migrations_status": "$execute_migrations_func",
-        "prepare_efi_partition_status": "$execute_migrations_func"
-EOF
-    # Output public variables as JSON object
-    cat <<EOF
+    "Signals": {
+        "Task MSG": "$TASK_MSG",
+        "Task Tracker": "$TASK_TRACKER",
+        "Task Error": "$TASK_ERROR",
+        "Task Error Message": "$TASK_ERROR_MSG",
+        "Task Warning": "$TASK_WARNING",
+        "Task Warning Message": "$TASK_WARNING_MSG",
     },
-    "Variables": {
+    "Globals": {
         "Target": "$TARGET",
         "Local Install": "$LOCAL_INSTALL",
-        "Show UI": "$SHOW_UI",
         "Repair Install": "$REPAIR_INSTALL",
-        "Name": "$NAME",
+        "Show UI": "$SHOW_UI",
         "Mount Path": "$MOUNT_PATH",
         "SUBVOL": "$SUBVOL",
         "Deploy Path": "$DEPLOY_PATH",
         "Frzr Check Update": "$FRZR_CHECK_UPDATE",
-        "Frzr Steam Progress": "$FRZR_STEAM_PROGRESS",
-        "Frzr Source": "$FRZR_SOURCE",
         "Frzr Params": "$FRZR_PARAMS",
         "File Name": "$FILE_NAME",
         "IMG Name": "$IMG_NAME",
         "Base URL": "$BASE_URL",
         "Repo": "$REPO",
         "Release URL": "$RELEASE_URL",
-        "Checksum": "$CHECKSUM",
+        "Expected Checksum": "$EXPECTED_CHECKSUM",
+        "Actual Checksum": "$ACTUAL_CHECKSUM",
         "Channel": "$CHANNEL"
     }
 }
 EOF
 }
+
+trap frzr_status SIGINT SIGTERM ERR
 
 frzr_check() {
 local result=$1
@@ -103,10 +92,27 @@ fi
 echo $value
 }
 
-write_json_log(){
-   frzr_status > "$JSON_LOG_DIR/frzr.json"
+write_tracker_file(){
+   frzr_status > "$TRACKER_FILE_DIR/frzr.tracker"
 }
 
+# Define a function to handle errors
+handle_error() {
+    local function_name="$1"
+    local line_number="$2"
+    local command="$3"
+    
+    echo "Error occurred in function '${function_name}' on line ${line_number}. Command: '${command}'"
+    
+    frzr_status
+    
+    if [ -f /tmp/frzr.lock ]; then
+       rm /tmp/frzr.lock
+    fi
+}
+
+# Set up trap to catch errors and call handle_error function
+trap 'handle_error "${FUNCNAME[0]}" "$LINENO" "$BASH_COMMAND"' ERR
 
 # Begin execution
 if [ $EUID -ne 0 ]; then
