@@ -442,11 +442,6 @@ prepare_efi_partition() {
 }
 
 main() {
-	if [ $EUID -ne 0 ]; then
-		echo "$FUNCNAME: $(basename $0) not run as root"
-		exit 1
-	fi
-
 	#TODO Utilize the state machine to manage the individual proccesses to send signals to external monitors
 	## Signals
 	#TASK_STATE="" # The current state of the state machine
@@ -457,26 +452,73 @@ main() {
 	#TASK_WARNING=0 # Signal to let listeners know there is a warning
 	#TASK_WARNING_MSG="" # Warning message. EX: "BTRFS filesystem was supposed to be locked, but it was already unlocked. Continuing.."
 
+	FRZR_CHECK_UPDATE=0
+	FRZR_STEAM_PROGRESS=0
+	FRZR_SOURCE=""
+	FRZR_PARAMS=""
+
 	local RUNNING=false
 	local STATE="BEGIN"
 
 	while $RUNNING; do
 	  case "$STATE" in
 	    "BEGIN")
-	      TASK_STATE="BEGIN"
-	      # Fetch information from the repo etc.
-	      STATE="CHECK"
+	    	TASK_STATE="BEGIN"
+	    	# Fetch information from the repo etc.
+	    	STATE="CHECK"
+
+			while (( "$#" )); do
+				case $1 in
+					--check)
+						FRZR_CHECK_UPDATE=1
+						shift
+						;;
+					--steam-progress)
+						FRZR_STEAM_PROGRESS=1
+						shift
+						;;
+					-*|--*)
+						TASK_ERROR=1
+						TASK_ERROR_MSG="Unknown argument $1"
+						STATE="FAIL"
+						;;
+					*) # preserve positional arguments
+						FRZR_PARAMS="${FRZR_PARAMS}$1 " # Use trailing space for the match below
+						shift
+						;;
+				esac
+			done
 	      ;;
 	    "CHECK")
-	      TASK_STATE="BEGIN"
-	      # Check system status for compatbility. Did we boot with UEFI?
-	      STATE="DOWNLOAD"
-	      ;;
+			TASK_STATE="BEGIN"
+			# Check system status for compatbility. Are we root? Did we boot with UEFI?
+
+			TASK_MSG="Checking for root privileges"
+			if [ $EUID -ne 0 ]; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="$(basename $0) not run as root"
+				STATE="FAIL"
+			else
+				TASK_MSG="Checking is system has booted via UEFI"
+				check_uefi_result=$(check_uefi)
+				if ! echo "${check_uefi_result}" | grep -q 'OK'; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="${check_uefi_result}"
+					STATE="FAIL"
+				else
+					STATE="DOWNLOAD"
+				fi
+			fi
+			;;
 	    "DOWNLOAD")
-	      TASK_STATE="DOWNLOAD"
-	      # Download checksums and system image
-	      STATE="CHECKSUM"
-	      ;;
+			TASK_STATE="DOWNLOAD"
+			# Download checksums and system image
+
+			# keep only the first param as source
+			FRZR_SOURCE="${FRZR_PARAMS%% *}"
+
+			STATE="CHECKSUM"
+			;;
 	    "CHECKSUM")
 	      TASK_STATE="CHECKSUM"
 	      # Verify checksums of downloaded files
@@ -518,31 +560,9 @@ main() {
 	  esac
 	done
 
-	FRZR_CHECK_UPDATE=0
-	FRZR_STEAM_PROGRESS=0
-	FRZR_SOURCE=""
-	FRZR_PARAMS=""
+	
 
-	while (( "$#" )); do
-		case $1 in
-			--check)
-				FRZR_CHECK_UPDATE=1
-				shift
-				;;
-			--steam-progress)
-				FRZR_STEAM_PROGRESS=1
-				shift
-				;;
-			-*|--*)
-				echo "Unknown argument $1"
-				exit 1
-				;;
-			*) # preserve positional arguments
-				FRZR_PARAMS="${FRZR_PARAMS}$1 " # Use trailing space for the match below
-				shift
-				;;
-		esac
-	done
+	
 
 	check_uefi_result=$(check_uefi)
 	echo "UEFI Check: ${check_uefi_result}"
