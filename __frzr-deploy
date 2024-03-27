@@ -465,10 +465,11 @@ main() {
 
 	local RUNNING=false
 	local STATE="CHECK"
-
+	echo "Entering Running loop"
 	while $RUNNING; do
 		case "$STATE" in
 		"CHECK")
+			echo "Entering Check case"
 			TASK_STATE="CHECK"
 			TASK_MSG="Checking for root privileges"
 			if [ $EUID -ne 0 ]; then
@@ -508,6 +509,7 @@ main() {
 					;;
 				esac
 			done
+			echo "Entering Begin Case"
 			STATE="BEGIN"
 			;;
 		"BEGIN")
@@ -552,6 +554,7 @@ main() {
 					BOOT_CFG="${efi_root_path}/loader/entries/${deploy_systemd_boot_cfg}"
 				fi
 			fi
+			echo "Entering Download case"
 			STATE="DOWNLOAD"
 			;;
 		"DOWNLOAD")
@@ -628,6 +631,7 @@ main() {
 						whiptail --gauge "Downloading system image (${NAME})" 10 50 0
 				fi
 			fi
+			echo "Entering Chucksum Case"
 			STATE="CHECKSUM"
 			;;
 		"CHECKSUM")
@@ -642,12 +646,14 @@ main() {
 				TASK_ERROR_MSG="Checksum does not match"
 			fi
 			TASK_TRACKER=1 # Tell any listeners this task was completed, I'm not sure this variable will be needed in the end
+			echo "Entering Extract Case"
 			STATE="EXTRACT"
 			;;
 		"EXTRACT")
 			TASK_STATE="EXTRACT"
 			# Extract tar of system image
 			# This step might not ever need to be used, but left here depending on the occasion it may be needed.
+			echo "Entering Install Case"
 			STATE="INSTALL"
 			;;
 		"INSTALL")
@@ -683,6 +689,7 @@ main() {
 					fi
 				fi
 			fi
+			echo "Entering Verify Case"
 			STATE="VERIFY"
 			;;
 		"VERIFY")
@@ -698,6 +705,7 @@ main() {
 
 			# Run frzr-initramfs to create mkinicpio.conf and build an initramfs
 			#frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
+			echo "Entering Cleanup Case"
 			STATE="CLEANUP"
 			;;
 		"CLEANUP")
@@ -762,6 +770,7 @@ main() {
 
 				exit 1
 			fi
+			cho "Entering Success Case"
 			STATE="SUCCESS"
 			;;
 		"SUCCESS")
