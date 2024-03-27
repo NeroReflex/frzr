@@ -464,7 +464,7 @@ main() {
 	FRZR_PARAMS=""
 
 	local RUNNING=false
-	local STATE="BEGIN"
+	local STATE="CHECK"
 
 	while $RUNNING; do
 		case "$STATE" in
@@ -552,6 +552,7 @@ main() {
 					BOOT_CFG="${efi_root_path}/loader/entries/${deploy_systemd_boot_cfg}"
 				fi
 			fi
+			STATE="DOWNLOAD"
 			;;
 		"DOWNLOAD")
 			TASK_STATE="DOWNLOAD"
@@ -595,9 +596,8 @@ main() {
 					echo "No matching source found"
 					if curl --http1.1 -L -s "${RELEASES_URL}" | grep "rate limit" >/dev/null; then
 						echo "GitHub API rate limit exceeded"
-						exit 29
 					fi
-					exit 1
+					STATE="FAIL"
 				fi
 
 				FILE_NAME=$(basename ${IMG_URL})
@@ -609,12 +609,11 @@ main() {
 
 				if [ -e ${SUBVOL} ]; then
 					echo "${NAME} already installed; aborting"
-					exit 7 # let Steam know there is no update available
+					STATE="FAIL"
 				fi
 
 				if [ $FRZR_CHECK_UPDATE -eq 1 ]; then
 					echo "Update available: ${NAME}"
-					exit 0 # let Steam know there is an update available
 				fi
 
 				if [ $FRZR_STEAM_PROGRESS -eq 1 ]; then
