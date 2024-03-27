@@ -463,7 +463,7 @@ main() {
 	FRZR_SOURCE=""
 	FRZR_PARAMS=""
 
-	local RUNNING=false
+	local RUNNING=true
 	local STATE="CHECK"
 	echo "Entering Running loop"
 	while $RUNNING; do
