@@ -20,17 +20,18 @@ write_log() {
 # $1 the directory
 # return 0 if the directory is a subvolume, 1 otherwise
 is_btrfs_subvolume() {
-    local dir=$1
-    [ "$(stat -f --format="%T" "$dir")" == "btrfs" ] || return 1
-    inode="$(stat --format="%i" "$dir")"
-    case "$inode" in
-        2|256)
-            return 0;;
-        *)
-            return 1;;
-    esac
+	local dir=$1
+	[ "$(stat -f --format="%T" "$dir")" == "btrfs" ] || return 1
+	inode="$(stat --format="%i" "$dir")"
+	case "$inode" in
+	2 | 256)
+		return 0
+		;;
+	*)
+		return 1
+		;;
+	esac
 }
-
 
 # Ensure the subvolume is in RW state
 # PRE=
@@ -44,7 +45,7 @@ btrfs_subvolume_set_rw() {
 		local lock_state=$(btrfs property get -fts "$dir")
 		if [[ $lock_state == *"ro=true"* ]]; then
 			btrfs property set -fts ${dir} ro false
-			
+
 			local lock_state_after_set=$(btrfs property get -fts "$dir")
 			if [[ $lock_state == *"ro=false"* ]]; then
 				echo "OK"
@@ -71,7 +72,7 @@ btrfs_subvolume_set_ro() {
 		local lock_state=$(btrfs property get -fts "$dir")
 		if [[ $lock_state == *"ro=false"* ]]; then
 			btrfs property set -fts ${dir} ro true
-			
+
 			local lock_state_after_set=$(btrfs property get -fts "$dir")
 			if [[ $lock_state == *"ro=true"* ]]; then
 				echo "OK"
@@ -96,7 +97,7 @@ install_image() {
 
 	if [ -d "${deploy_path}" ]; then
 		if [[ "${IMG_FILE##*.}" == "img" ]]; then
-			btrfs receive --quiet ${DEPLOY_PATH} < ${IMG_FILE}
+			btrfs receive --quiet ${DEPLOY_PATH} <${IMG_FILE}
 			echo "OK"
 		elif [[ "${IMG_FILE##*.}" == "zst" ]]; then
 			zstd -d -c ${IMG_FILE} | btrfs receive --quiet ${DEPLOY_PATH}
@@ -130,13 +131,15 @@ get_img_url() {
 	result=$(echo "${result}" | jq 'del(.[] | select(.assets[].state != "uploaded"))')
 
 	# Always check for stable date
-	if stable_release_date=$(echo "${result}" | jq -er '[ .[] |
+	if stable_release_date=$(
+		echo "${result}" | jq -er '[ .[] |
 			select(.prerelease==false) ] |
 			first |
 			.created_at'
-		); then
+	); then
 		# Check for stable url, this is the latest that have prerelease == false
-		stable_download_url=$(echo "${result}" | jq -r '[ .[] |
+		stable_download_url=$(
+			echo "${result}" | jq -r '[ .[] |
 			select(.prerelease==false) ] |
 			first |
 			.assets[] |
@@ -150,37 +153,39 @@ get_img_url() {
 		stable_download_url=""
 	fi
 
-
 	# Filter channels by release naming conventions
-	if [[ "$update_channel" =~ ^[0-9]+\-?[0-9]*$ ]] ; then
+	if [[ "$update_channel" =~ ^[0-9]+\-?[0-9]*$ ]]; then
 		# Check first for explicit version numbers between stable releases
 		# Useful for downgrading
-		result=$(echo "${result}" | jq -r "[ .[] |
+		result=$(
+			echo "${result}" | jq -r "[ .[] |
 					select(.prerelease==false) |
 					select(.name|test(\" ${update_channel}\$\")) ] |
 					first |
 					.assets[] |
 					select(.browser_download_url | test(\"img\")) |
 					.browser_download_url"
-				)
+		)
 	elif [ "$update_channel" == "stable" ]; then
 		result=$stable_download_url
 	elif [ "$update_channel" == "testing" ]; then
 		# Testing channel have prerelease = true and no other tags
-		if testing_release_date=$(echo "${result}" | jq -er '[ .[] |
+		if testing_release_date=$(
+			echo "${result}" | jq -er '[ .[] |
 			select(.prerelease==true) |
 			select(.name|test("\\[.*\\]")|not) ] |
 			first |
 			.created_at'
-			); then
-			testing_url=$(echo "${result}" | jq -r '[ .[] |
+		); then
+			testing_url=$(
+				echo "${result}" | jq -r '[ .[] |
 						select(.prerelease==true) |
 						select(.name|test("\\[.*\\]")|not) ] |
 						first |
 						.assets[] |
 						select(.browser_download_url | test("img")) |
 						.browser_download_url'
-					)
+			)
 			if [ $(date -d $testing_release_date +%s) -le $(date -d $stable_release_date +%s) ]; then
 				result=$stable_download_url
 			else
@@ -192,20 +197,22 @@ get_img_url() {
 	else
 		# Match any release with CHANNEL as a tag (including unstable)
 		result=$(echo ${result} | jq "[ .[] | select(.prerelease==true) | select(.name|test(\"\\\[${update_channel}\\\]\" ; \"i\")) ]")
-			if unstable_release_date=$(echo "${result}" | jq -er "[ .[] |
+		if unstable_release_date=$(
+			echo "${result}" | jq -er "[ .[] |
 					select(.prerelease==true) |
 					select(.name|test(\"\\\[${update_channel}\\\]\" ; \"i\")) ] |
 					first |
 					.created_at"
-				); then
-			unstable_url=$(echo "${result}" | jq -r "[ .[] |
+		); then
+			unstable_url=$(
+				echo "${result}" | jq -r "[ .[] |
 						select(.prerelease==true) |
 						select(.name|test(\"\\\[${update_channel}\\\]\" ; \"i\")) ] |
 						first |
 						.assets[] |
 						select(.browser_download_url | test(\"img\")) |
 						.browser_download_url"
-					)
+			)
 			if [ $(date -d $unstable_release_date +%s) -le $(date -d $stable_release_date +%s) ]; then
 				result=$stable_download_url
 			else
@@ -250,7 +257,7 @@ generate_systemd_boot_cfg() {
 		if [ -f ${mount_path}/${version}/${initramfs} ]; then
 			# write title chimeraos-46_fcc653a3 (also creating the boot entry file if it doesn't exists yet)
 			echo "title ${version}" | tee ${entry_conf} >/dev/null
-			
+
 			# write linux /chimeraos-46_fcc653a3/vmlinuz-linux
 			echo "linux /${version}/${vmlinuz}" | tee --append ${entry_conf} >/dev/null
 
@@ -282,13 +289,13 @@ generate_systemd_boot_cfg() {
 			echo "OK"
 		else
 			write_log "$FUNCNAME: initramfs has NOT been found at '$mount_path/$version/$initramfs'" 1
-			
+
 			# return the error to be printed out
 			echo "ERROR: initramfs not found"
 		fi
 	else
 		write_log "$FUNCNAME: vmlinuz (linux kernel) has been found at '$mount_path/$version/$vmlinuz'" 1
-		
+
 		# return the error to be printed out
 		echo "ERROR: kernel not found"
 	fi
@@ -299,7 +306,7 @@ get_deployment_to_delete() {
 	local boot_cfg_path=${2}
 	local deployment_path=${3}
 
-	local TO_BOOT=`get_next_boot_deployment ${current_version} ${boot_cfg_path}`
+	local TO_BOOT=$(get_next_boot_deployment ${current_version} ${boot_cfg_path})
 
 	ls -1 ${deployment_path} | grep -v ${current_version} | grep -v ${TO_BOOT} | head -1 || echo
 }
@@ -309,8 +316,8 @@ get_next_boot_deployment() {
 	local boot_cfg_path=${2}
 
 	local TO_BOOT='this-is-not-a-valid-version-string'
-	if [ -f "${boot_cfg_path}" ] && grep "^title" "${boot_cfg_path}" > /dev/null; then
-		TO_BOOT=`grep ^title ${boot_cfg_path} | sed 's/title //'`
+	if [ -f "${boot_cfg_path}" ] && grep "^title" "${boot_cfg_path}" >/dev/null; then
+		TO_BOOT=$(grep ^title ${boot_cfg_path} | sed 's/title //')
 	fi
 
 	echo ${TO_BOOT}
@@ -321,7 +328,7 @@ clean_progress() {
 	local postfix=$2
 	local last_value=$scale
 	while IFS= read -r line; do
-		value=$(( ${line}*${scale}/100 ))
+		value=$((${line} * ${scale} / 100))
 		if [ "$last_value" != "$value" ]; then
 			echo ${value}${postfix}
 			last_value=$value
@@ -353,12 +360,11 @@ execute_migrations() {
 	local deployment=$2
 	local frzr_root=$3
 
-	if compgen -G "${deployment}"/usr/lib/frzr.d/*.migration > /dev/null ; then
-		for m in "${deployment}"/usr/lib/frzr.d/*.migration ;
-		do
+	if compgen -G "${deployment}"/usr/lib/frzr.d/*.migration >/dev/null; then
+		for m in "${deployment}"/usr/lib/frzr.d/*.migration; do
 			unset -f post_install
 			. $m
-			if [ "$(type -t post_install)" == function ] ; then
+			if [ "$(type -t post_install)" == function ]; then
 				post_install "${frzr_root}" "${deployment}" "${version}"
 			fi
 			unset -f post_install
@@ -407,19 +413,19 @@ prepare_efi_partition() {
 
 			# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
 			local additional_arguments=""
-			if [ -f ${deployment_root}/usr/lib/frzr.d/bootconfig.conf ] ; then
+			if [ -f ${deployment_root}/usr/lib/frzr.d/bootconfig.conf ]; then
 				additional_arguments="$additional_arguments $(cat ${deployment_root}/usr/lib/frzr.d/bootconfig.conf)"
 			else
 				write_log "$FUNCNAME: File '${deployment_root}/usr/lib/frzr.d/bootconfig.conf' has not been found. No additional boot arguments will be set." 2
 			fi
 
 			local amd_ucode="amd-ucode.img"
-			if [ -e ${deployment_root}/boot/amd-ucode.img ] ; then
+			if [ -e ${deployment_root}/boot/amd-ucode.img ]; then
 				cp ${deployment_root}/boot/amd-ucode.img ${efi_root_path}/${version}/${amd_ucode}
 			fi
 
 			local intel_ucode="intel-ucode.img"
-			if [ -e ${deployment_root}/boot/intel-ucode.img ] ; then
+			if [ -e ${deployment_root}/boot/intel-ucode.img ]; then
 				cp ${deployment_root}/boot/intel-ucode.img ${efi_root_path}/${version}/${intel_ucode}
 			fi
 
@@ -427,7 +433,7 @@ prepare_efi_partition() {
 			echo "systemd-boot install: ${systemd_boot_update_result}"
 
 			if echo "${systemd_boot_update_result}" | grep -q 'OK'; then
-				echo "default ${boot_entry}" > ${mount_path}/loader/loader.conf
+				echo "default ${boot_entry}" >${mount_path}/loader/loader.conf
 
 				echo "OK"
 			else
@@ -461,38 +467,9 @@ main() {
 	local STATE="BEGIN"
 
 	while $RUNNING; do
-	  case "$STATE" in
-	    "BEGIN")
-	    	TASK_STATE="BEGIN"
-	    	# Fetch information from the repo etc.
-	    	STATE="CHECK"
-
-			while (( "$#" )); do
-				case $1 in
-					--check)
-						FRZR_CHECK_UPDATE=1
-						shift
-						;;
-					--steam-progress)
-						FRZR_STEAM_PROGRESS=1
-						shift
-						;;
-					-*|--*)
-						TASK_ERROR=1
-						TASK_ERROR_MSG="Unknown argument $1"
-						STATE="FAIL"
-						;;
-					*) # preserve positional arguments
-						FRZR_PARAMS="${FRZR_PARAMS}$1 " # Use trailing space for the match below
-						shift
-						;;
-				esac
-			done
-	      ;;
-	    "CHECK")
-			TASK_STATE="BEGIN"
-			# Check system status for compatbility. Are we root? Did we boot with UEFI?
-
+		case "$STATE" in
+		"CHECK")
+			TASK_STATE="CHECK"
 			TASK_MSG="Checking for root privileges"
 			if [ $EUID -ne 0 ]; then
 				TASK_ERROR=1
@@ -506,341 +483,307 @@ main() {
 					TASK_ERROR_MSG="${check_uefi_result}"
 					STATE="FAIL"
 				else
-					STATE="DOWNLOAD"
+					TASK_MSG="We are booted using UEFI"
 				fi
 			fi
+			# Check if any updates are available and preserve FRZR parameters
+			while (("$#")); do
+				case $1 in
+				--check)
+					FRZR_CHECK_UPDATE=1
+					shift
+					;;
+				--steam-progress)
+					FRZR_STEAM_PROGRESS=1
+					shift
+					;;
+				-* | --*)
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Unknown argument $1"
+					STATE="FAIL"
+					;;
+				*)                               # preserve positional arguments
+					FRZR_PARAMS="${FRZR_PARAMS}$1 " # Use trailing space for the match below
+					shift
+					;;
+				esac
+			done
+			STATE="BEGIN"
 			;;
-	    "DOWNLOAD")
-			TASK_STATE="DOWNLOAD"
-			# Download checksums and system image
-
+		"BEGIN")
+			TASK_STATE="BEGIN"
 			# keep only the first param as source
 			FRZR_SOURCE="${FRZR_PARAMS%% *}"
 
-			STATE="CHECKSUM"
-			;;
-	    "CHECKSUM")
-	      TASK_STATE="CHECKSUM"
-	      # Verify checksums of downloaded files
-	      STATE="EXTRACT"
-	      ;;
-	    "EXTRACT")
-	      TASK_STATE="EXTRACT"
-	      # Extract tar of system image
-	      STATE="INSTALL"
-	      ;;
-	    "INSTALL")
-	      TASK_STATE="INSTALL"
-	      # Use BTRFS receive to install the image
-	      STATE="VERIFY"
-	      ;;
-	    "VERIFY")
-	      TASK_STATE="VERIFY"
-	      # Verify the system installation status
-	      STATE="CLEANUP"
-	      ;;
-	    "CLEANUP")
-	      TASK_STATE="CLEANUP"
-	      # Delete the downloaded system img etc.
-	      STATE="SUCCESS"
-	      ;;
-	    "SUCCESS")
-	      TASK_STATE="SUCCESS"
-	      RUNNING=false
-	      ;;
-	    "FAIL")
-	      TASK_STATE="FAIL"
-	      RUNNING=false
-	      ;;
-	    *)
-	      TASK_STATE="UNKNOWN_ERROR"
-	      echo "Something went terribly wrong"
-	      RUNNING=false
-	      ;;
-	  esac
-	done
+			MOUNT_PATH=/tmp/frzr_root
 
-	
-
-	
-
-	check_uefi_result=$(check_uefi)
-	echo "UEFI Check: ${check_uefi_result}"
-	if echo "${check_uefi_result}" | grep -q 'OK'; then
-		# keep only the first param as source
-		FRZR_SOURCE="${FRZR_PARAMS%% *}"
-
-		MOUNT_PATH=/tmp/frzr_root
-
-		# Make sure the frzr_root is mounted during the deployment procedure
-		# this code is based on the fact that when a btrfs filesystem is created 
-		# the default subvolid that is created contextually has the ID set to 256
-		# also as a matter of fact in btrfs is impossible to change subvolumes IDs
-		if ! mountpoint -q ${MOUNT_PATH}; then
-			mkdir -p ${MOUNT_PATH}
-			mount -L frzr_root -t btrfs -o subvolid=5 ${MOUNT_PATH}
-			sleep 5
-		fi
-
-		if ! mountpoint -q ${MOUNT_PATH}; then
-			write_log "Using '${MOUNT_PATH}' as the main subvolume mount path"
-
-			DEPLOY_PATH=${MOUNT_PATH}/deployments
-			mkdir -p ${DEPLOY_PATH}
-
-			# TODO: check that DEPLOY_PATH exists, and if not terminate the whole procedure giving the user an error
-
-			write_log "Using '${DEPLOY_PATH}' as the deployment destination path"
-
-			local deploy_systemd_boot_cfg="frzr.conf"
-
-			# Make sure the EFI partition is mounted during the deployment procedure
-			local efi_root_path="${MOUNT_PATH}/efi"
-			if ! mountpoint -q ${efi_root_path} && ls -1 /dev/disk/by-label | grep frzr_efi > /dev/null; then
-				mkdir -p ${efi_root_path}
-				mount -L frzr_efi ${efi_root_path}
+			# Make sure the frzr_root is mounted during the deployment procedure
+			# this code is based on the fact that when a btrfs filesystem is created
+			# the default subvolid that is created contextually has the ID set to 256
+			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
+			if ! mountpoint -q ${MOUNT_PATH}; then
+				mkdir -p ${MOUNT_PATH}
+				mount -L frzr_root -t btrfs -o subvolid=5 ${MOUNT_PATH}
 				sleep 5
 			fi
 
-			# Check the "EFI System" partition is actually mounted
-			if ! mountpoint -q ${efi_root_path} && ls -1 /dev/disk/by-label | grep frzr_efi > /dev/null; then
-				BOOT_CFG="${efi_root_path}/loader/entries/${deploy_systemd_boot_cfg}"
+			if ! mountpoint -q ${MOUNT_PATH}; then
+				write_log "Using '${MOUNT_PATH}' as the main subvolume mount path"
 
-				# delete deployments under these conditions:
-				# - we are currently running inside a frzr deployment (i.e. not during install)
-				# - the deployment is not currently running
-				# - the deployment is not configured to be run on next boot
-				if frzr-release > /dev/null; then
-					CURRENT=`frzr-release`
-					local deployment_to_be_removed=`get_deployment_to_delete ${CURRENT} ${BOOT_CFG} ${DEPLOY_PATH}`
+				DEPLOY_PATH=${MOUNT_PATH}/deployments
+				mkdir -p ${DEPLOY_PATH}
 
-					if [ ! -z ${deployment_to_be_removed} ]; then
-						echo "deleting ${deployment_to_be_removed}..."
-						btrfs subvolume delete ${DEPLOY_PATH}/${deployment_to_be_removed} || true
-						rm -rf ${MOUNT_PATH}/boot/${deployment_to_be_removed}
-					fi
+				# TODO: check that DEPLOY_PATH exists, and if not terminate the whole procedure giving the user an error
+
+				write_log "Using '${DEPLOY_PATH}' as the deployment destination path"
+
+				local deploy_systemd_boot_cfg="frzr.conf"
+
+				# Make sure the EFI partition is mounted during the deployment procedure
+				local efi_root_path="${MOUNT_PATH}/efi"
+				if ! mountpoint -q ${efi_root_path} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
+					mkdir -p ${efi_root_path}
+					mount -L frzr_efi ${efi_root_path}
+					sleep 5
 				fi
 
-				if [ ! -z "$FRZR_SOURCE" ] && [ "$FRZR_SOURCE" != " " ] && [ $FRZR_CHECK_UPDATE -eq 0 ] && [ $FRZR_STEAM_PROGRESS -eq 0 ]; then
-					echo "$FRZR_SOURCE" > "${MOUNT_PATH}/source"
+				# Check the "EFI System" partition is actually mounted
+				if ! mountpoint -q ${efi_root_path} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
+					BOOT_CFG="${efi_root_path}/loader/entries/${deploy_systemd_boot_cfg}"
+				fi
+			fi
+			;;
+		"DOWNLOAD")
+			TASK_STATE="DOWNLOAD"
+			# Check if source needs updated or needs to be created for the first time
+			if [ ! -z "$FRZR_SOURCE" ] && [ "$FRZR_SOURCE" != " " ] && [ $FRZR_CHECK_UPDATE -eq 0 ] && [ $FRZR_STEAM_PROGRESS -eq 0 ]; then
+				echo "$FRZR_SOURCE" >"${MOUNT_PATH}/source"
+			fi
+
+			if [ -e "${MOUNT_PATH}/source" ]; then
+				SOURCE=$(cat "${MOUNT_PATH}/source" | head -1)
+			else
+				echo "WARNING: source wasn't specified"
+			fi
+
+			if [ "${local_install}" == true ]; then
+				mkdir tmp_source
+				mount -o rw -L FRZR_UPDATE /root/tmp_source
+				FILE_NAME=$(basename /root/tmp_source/*.img.tar.xz*)
+				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
+				SUBVOL="${DEPLOY_PATH}/${NAME}"
+				IMG_FILE="/root/tmp_source/${FILE_NAME}"
+			elif [[ "$FRZR_SOURCE" == *".img.tar.xz" ]]; then
+				FILE_NAME=$(basename ${FRZR_SOURCE})
+				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
+				SUBVOL="${DEPLOY_PATH}/${NAME}"
+				IMG_FILE=${FRZR_SOURCE}
+			elif [[ "$FRZR_SOURCE" == *".img" ]]; then
+				FILE_NAME=$(basename ${FRZR_SOURCE})
+				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
+				SUBVOL="${DEPLOY_PATH}/${NAME}"
+				IMG_FILE=${FRZR_SOURCE}
+			else
+				REPO=$(echo "${SOURCE}" | cut -f 1 -d ':')
+				CHANNEL=$(echo "${SOURCE}" | cut -f 2 -d ':')
+
+				RELEASES_URL="https://api.github.com/repos/${REPO}/releases"
+
+				IMG_URL=$(curl --http1.1 -L -s "${RELEASES_URL}" | get_img_url "${CHANNEL}")
+
+				if [ -z "$IMG_URL" ] || [ "$IMG_URL" == "null" ]; then
+					echo "No matching source found"
+					if curl --http1.1 -L -s "${RELEASES_URL}" | grep "rate limit" >/dev/null; then
+						echo "GitHub API rate limit exceeded"
+						exit 29
+					fi
+					exit 1
 				fi
 
-				if [ -e "${MOUNT_PATH}/source" ]; then
-					SOURCE=`cat "${MOUNT_PATH}/source" | head -1`
-				else
-					echo "WARNING: source wasn't specified"
+				FILE_NAME=$(basename ${IMG_URL})
+				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
+				BASE_URL=$(dirname "${IMG_URL}")
+				CHECKSUM=$(curl --http1.1 -L -s "${BASE_URL}/sha256sum.txt" | cut -f -1 -d ' ')
+				SUBVOL="${DEPLOY_PATH}/${NAME}"
+				IMG_FILE="${MOUNT_PATH}/${FILE_NAME}"
+
+				if [ -e ${SUBVOL} ]; then
+					echo "${NAME} already installed; aborting"
+					exit 7 # let Steam know there is no update available
 				fi
 
-				if [ "${local_install}" == true ]; then
-						mkdir tmp_source
-						mount -o rw -L FRZR_UPDATE /root/tmp_source
-					FILE_NAME=$(basename /root/tmp_source/*.img.tar.xz*)
-					NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
-					SUBVOL="${DEPLOY_PATH}/${NAME}"
-					IMG_FILE="/root/tmp_source/${FILE_NAME}"
-				elif [[ "$FRZR_SOURCE" == *".img.tar.xz" ]]; then
-					FILE_NAME=$(basename ${FRZR_SOURCE})
-					NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
-					SUBVOL="${DEPLOY_PATH}/${NAME}"
-					IMG_FILE=${FRZR_SOURCE}
-				elif [[ "$FRZR_SOURCE" == *".img" ]]; then
-					FILE_NAME=$(basename ${FRZR_SOURCE})
-					NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
-					SUBVOL="${DEPLOY_PATH}/${NAME}"
-					IMG_FILE=${FRZR_SOURCE}
-				else
-					REPO=$(echo "${SOURCE}" | cut -f 1 -d ':')
-					CHANNEL=$(echo "${SOURCE}" | cut -f 2 -d ':')
+				if [ $FRZR_CHECK_UPDATE -eq 1 ]; then
+					echo "Update available: ${NAME}"
+					exit 0 # let Steam know there is an update available
+				fi
 
-					RELEASES_URL="https://api.github.com/repos/${REPO}/releases"
-
-					IMG_URL=$(curl --http1.1 -L -s "${RELEASES_URL}" | get_img_url "${CHANNEL}")
-
-					if [ -z "$IMG_URL" ] || [ "$IMG_URL" == "null" ]; then
-						echo "No matching source found"
-						if curl --http1.1 -L -s "${RELEASES_URL}" | grep "rate limit" > /dev/null; then
-							echo "GitHub API rate limit exceeded"
-							exit 29
-						fi
-						exit 1
-					fi
-
-					FILE_NAME=$(basename ${IMG_URL})
-					NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
-					BASE_URL=$(dirname "${IMG_URL}")
-					CHECKSUM=$(curl --http1.1 -L -s "${BASE_URL}/sha256sum.txt" | cut -f -1 -d ' ')
-					SUBVOL="${DEPLOY_PATH}/${NAME}"
-					IMG_FILE="${MOUNT_PATH}/${FILE_NAME}"
-
-					if [ -e ${SUBVOL} ]; then
-						echo "${NAME} already installed; aborting"
-						exit 7 # let Steam know there is no update available
-					fi
-
-					if [ $FRZR_CHECK_UPDATE -eq 1 ]; then
-						echo "Update available: ${NAME}"
-						exit 0 # let Steam know there is an update available
-					fi
-
-					if [ $FRZR_STEAM_PROGRESS -eq 1 ]; then
-						curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 | \
+				if [ $FRZR_STEAM_PROGRESS -eq 1 ]; then
+					curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
 						stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 91 %
-					elif [ -z ${SHOW_UI} ]; then
-						echo "downloading ${NAME}..."
-						curl --http1.1 -L -o "${IMG_FILE}" -C - "${IMG_URL}"
-					else
-						curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 | \
-						stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 100 | \
-						whiptail --gauge "Downloading system image (${NAME})" 10 50 0
-					fi
-
-					CHECKSUM2=`sha256sum "${IMG_FILE}" | cut -d' ' -f 1`
-					if [ "$CHECKSUM" != "$CHECKSUM2" ]; then
-						rm -f "${IMG_FILE}"
-						echo "checksum does not match; aborting"
-						exit 1
-					fi
-				fi
-
-				if [ -z ${SHOW_UI} ]; then
-					echo "installing ${NAME}..."
+				elif [ -z ${SHOW_UI} ]; then
+					echo "downloading ${NAME}..."
+					curl --http1.1 -L -o "${IMG_FILE}" -C - "${IMG_URL}"
 				else
-					whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
+					curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
+						stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 100 |
+						whiptail --gauge "Downloading system image (${NAME})" 10 50 0
 				fi
+			fi
+			STATE="CHECKSUM"
+			;;
+		"CHECKSUM")
+			TASK_STATE="CHECKSUM"
+			TASK_MSG="Verying checksums match"
+			CHECKSUM2=$(sha256sum "${IMG_FILE}" | cut -d' ' -f 1)
+			if [ "$CHECKSUM" != "$CHECKSUM2" ]; then
+				rm -f "${IMG_FILE}"
+				echo "checksum does not match; aborting"
+				# We can attempt to redownload the image again here instead of aborting like the original behavior
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Checksum does not match"
+			fi
+			TASK_TRACKER=1 # Tell any listeners this task was completed, I'm not sure this variable will be needed in the end
+			STATE="EXTRACT"
+			;;
+		"EXTRACT")
+			TASK_STATE="EXTRACT"
+			# Extract tar of system image
+			# This step might not ever need to be used, but left here depending on the occasion it may be needed.
+			STATE="INSTALL"
+			;;
+		"INSTALL")
+			TASK_STATE="INSTALL"
+			# Use BTRFS receive to install the image
+			if [ -z ${SHOW_UI} ]; then
+				echo "installing ${NAME}..."
+			else
+				whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
+			fi
 
-				# Write the deployment image to disk
-				local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
+			# Write the deployment image to disk
+			local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
+			if echo "${set_subvol_rw}" | grep -q 'OK'; then
+				local vmlinuz_name="vmlinuz-linux"
+				local initramfs_name="initramfs-linux.img"
+
+				# Migrations should be able to modify the new installed image: set ${SUBVOL} R/W
+				local set_subvol_rw=$(btrfs_subvolume_set_rw "${SUBVOL}")
+				echo "Deployment Set RW: ${set_subvol_rw}"
 				if echo "${set_subvol_rw}" | grep -q 'OK'; then
-					local vmlinuz_name="vmlinuz-linux"
-					local initramfs_name="initramfs-linux.img"
-					
-					# Migrations should be able to modify the new installed image: set ${SUBVOL} R/W
-					local set_subvol_rw=$(btrfs_subvolume_set_rw "${SUBVOL}")
-					echo "Deployment Set RW: ${set_subvol_rw}"
-					if echo "${set_subvol_rw}" | grep -q 'OK'; then
-						# Execute and migrations available in the image to be deployed
-						execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}"
+					# Execute and migrations available in the image to be deployed
+					execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}"
 
-						# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
-						if [ -f "${MOUNT_PATH}/root_uuid" ]; then
-							local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
-							sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
-						else
-							local disk=$(blkid -L frzr_root)
-							local root_uuid=$(blkid -s UUID -o value "${disk}p2")
-							sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
-						fi
-
-						# TODO: move /etc to a subvolume
-
-						# TODO: move /usr/modules/* to a frzr_root/subvolume and add a mount in x-initrd in /etc/fstab
-
-						# TODO: move /var to a submodule. handle pacman dir
-
-						# TODO: remove everything from deployment/home (so that the new partition or btrfs subvolume will get mounted)
-
-						# Export variables to be used by child processes for frzr-tweaks and frzr-initramfs
-						export MOUNT_PATH
-						export SUBVOL
-						export NAME
-						# TODO: remove the above when said tools can accept parameters
-
-						# Check if the FIRMWARE_OVERRIDE variable is set by the install media, if so enable firmware overrides
-						if [ -n "${FIRMWARE_OVERRIDE}" ]; then
-							echo "export USE_FIRMWARE_OVERRIDES=1" > ${MOUNT_PATH}/etc/device-quirks.conf
-						fi
-
-						# Run frzr-tweaks to execute the device-quirks to be supplied by the deployed images
-						#frzr-tweaks # TODO: pass the root as an argument and in the script default to "/"
-
-						# Run frzr-initramfs to create mkinicpio.conf and build an initramfs
-						#frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
-
-						# Migrations have been executed, frzr-tweaks and frzr-initramfs have been run: set the deployment subvolume back to being RO
-						local set_subvol_ro=$(btrfs_subvolume_set_ro "${SUBVOL}")
-						echo "Deployment Set RO: ${set_subvol_ro}"
-						if echo "${set_subvol_ro}" | grep -q 'OK'; then
-							# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-							local efi_update_result=$(prepare_efi_partition "${NAME}" "${efi_root_path}" ${SUBVOL} "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${deploy_systemd_boot_cfg}")
-							echo "EFI update: ${efi_update_result}"
-							if echo "${efi_update_result}" | grep -q 'OK'; then
-								rm -f ${MOUNT_PATH}/*.img.*
-
-								rm -rf /var/lib/pacman # undo frzr-unlock
-
-								# Activates the new deployed image by making it the default btrfs subvolume, therefore what a systemd-equipped initramfs will load
-								btrfs subvolume set-default 282 /
-
-								echo "deployment complete; restart to boot into ${NAME}"
-
-								# umount the efi path
-								umount -l ${efi_root_path}
-
-								# umount the frzr_root subvolume
-								umount -l ${MOUNT_PATH}
-							else # the bootloader could not be updated
-								echo "deployment failed; could not update the EFI partition"
-
-								# umount the efi path
-								umount -l ${efi_root_path}
-
-								# umount the frzr_root subvolume
-								umount -l ${MOUNT_PATH}
-
-								exit 1
-							fi
-						else # Image could not be set back to ro: this wouldn't be a problem, but indicates a greater problem and it's not safe to boot to it
-							echo "deployment failed; could not set the new image back in read-only state"
-
-							# umount the efi path
-							umount -l ${efi_root_path}
-
-							# umount the frzr_root subvolume
-							umount -l ${MOUNT_PATH}
-
-							exit 1
-						fi
-					else # Image could not be unlocked
-						echo "deployment failed; could not set the new image in read-write state"
-
-						# umount the efi path
-						umount -l ${efi_root_path}
-
-						# umount the frzr_root subvolume
-						umount -l ${MOUNT_PATH}
-						
-						exit 1
+					# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
+					if [ -f "${MOUNT_PATH}/root_uuid" ]; then
+						local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
+						sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
+					else
+						local disk=$(blkid -L frzr_root)
+						local root_uuid=$(blkid -s UUID -o value "${disk}p2")
+						sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
 					fi
-				else # No image written
-					echo "deployment failed; could not write the new image to disk"
+				fi
+			fi
+			STATE="VERIFY"
+			;;
+		"VERIFY")
+			TASK_STATE="VERIFY"
+			# Verify the system installation status, check for device quirks, and prepare for cleanup
+			# Check if the FIRMWARE_OVERRIDE variable is set by the install media, if so enable firmware overrides
+			if [ -n "${FIRMWARE_OVERRIDE}" ]; then
+				echo "export USE_FIRMWARE_OVERRIDES=1" >${MOUNT_PATH}/etc/device-quirks.conf
+			fi
+
+			# Run frzr-tweaks to execute the device-quirks to be supplied by the deployed images
+			#frzr-tweaks # TODO: pass the root as an argument and in the script default to "/"
+
+			# Run frzr-initramfs to create mkinicpio.conf and build an initramfs
+			#frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
+			STATE="CLEANUP"
+			;;
+		"CLEANUP")
+			TASK_STATE="CLEANUP"
+			# Delete the downloaded system img etc.
+
+			# delete deployments under these conditions:
+			# - we are currently running inside a frzr deployment (i.e. not during install)
+			# - the deployment is not currently running
+			# - the deployment is not configured to be run on next boot
+			if frzr-release >/dev/null; then
+				CURRENT=$(frzr-release)
+				local deployment_to_be_removed=$(get_deployment_to_delete ${CURRENT} ${BOOT_CFG} ${DEPLOY_PATH})
+
+				if [ ! -z ${deployment_to_be_removed} ]; then
+					echo "deleting ${deployment_to_be_removed}..."
+					btrfs subvolume delete ${DEPLOY_PATH}/${deployment_to_be_removed} || true
+					rm -rf ${MOUNT_PATH}/boot/${deployment_to_be_removed}
+				fi
+			fi
+			# Migrations have been executed, frzr-tweaks and frzr-initramfs have been run: set the deployment subvolume back to being RO
+			local set_subvol_ro=$(btrfs_subvolume_set_ro "${SUBVOL}")
+			echo "Deployment Set RO: ${set_subvol_ro}"
+			if echo "${set_subvol_ro}" | grep -q 'OK'; then
+				# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
+				local efi_update_result=$(prepare_efi_partition "${NAME}" "${efi_root_path}" ${SUBVOL} "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${deploy_systemd_boot_cfg}")
+				echo "EFI update: ${efi_update_result}"
+				if echo "${efi_update_result}" | grep -q 'OK'; then
+					rm -f ${MOUNT_PATH}/*.img.*
+
+					rm -rf /var/lib/pacman # undo frzr-unlock
+
+					# Activates the new deployed image by making it the default btrfs subvolume, therefore what a systemd-equipped initramfs will load
+					btrfs subvolume set-default 282 /
+
+					echo "deployment complete; restart to boot into ${NAME}"
 
 					# umount the efi path
 					umount -l ${efi_root_path}
 
 					# umount the frzr_root subvolume
 					umount -l ${MOUNT_PATH}
-					
+				else # the bootloader could not be updated
+					echo "deployment failed; could not update the EFI partition"
+
+					# umount the efi path
+					umount -l ${efi_root_path}
+
+					# umount the frzr_root subvolume
+					umount -l ${MOUNT_PATH}
+
 					exit 1
 				fi
-			else # Cannot mount "EFI System" partition
-				echo "deployment failed; could not mount the EFI partition"
+			else # Image could not be set back to ro: this wouldn't be a problem, but indicates a greater problem and it's not safe to boot to it
+				echo "deployment failed; could not set the new image back in read-only state"
 
+				# umount the efi path
+				umount -l ${efi_root_path}
+
+				# umount the frzr_root subvolume
 				umount -l ${MOUNT_PATH}
 
 				exit 1
 			fi
-		else # Cannot mount "frzr_root"
-			echo "deployment failed; could not mount the main system subvolume"
-
-			exit 1
-		fi
-	else # No UEFI found
-		echo "deployment failed; system not booted with UEFI: disable MBR (or CSM) boot in your motherboard setup"
-
-		exit 1
-	fi
+			STATE="SUCCESS"
+			;;
+		"SUCCESS")
+			# This state should only be used if the installation completed without errors
+			TASK_STATE="SUCCESS"
+			RUNNING=false
+			;;
+		"FAIL")
+			# This state should only be used if the installation failed
+			TASK_STATE="FAIL"
+			RUNNING=false
+			;;
+		*)
+			TASK_STATE="UNKNOWN_ERROR"
+			echo "Something went terribly wrong"
+			RUNNING=false
+			;;
+		esac
+	done
 }
 
-if [ "$0" = "$BASH_SOURCE" ] ; then
+if [ "$0" = "$BASH_SOURCE" ]; then
 	main "$@"
 fi
