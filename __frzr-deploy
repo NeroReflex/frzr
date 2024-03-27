@@ -688,26 +688,24 @@ main() {
 
 			# Write the deployment image to disk
 			local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
+			local vmlinuz_name="vmlinuz-linux"
+			local initramfs_name="initramfs-linux.img"
+
+			# Migrations should be able to modify the new installed image: set ${SUBVOL} R/W
+			local set_subvol_rw=$(btrfs_subvolume_set_rw "${SUBVOL}")
+			echo "Deployment Set RW: ${set_subvol_rw}"
 			if echo "${set_subvol_rw}" | grep -q 'OK'; then
-				local vmlinuz_name="vmlinuz-linux"
-				local initramfs_name="initramfs-linux.img"
+				# Execute and migrations available in the image to be deployed
+				execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}"
 
-				# Migrations should be able to modify the new installed image: set ${SUBVOL} R/W
-				local set_subvol_rw=$(btrfs_subvolume_set_rw "${SUBVOL}")
-				echo "Deployment Set RW: ${set_subvol_rw}"
-				if echo "${set_subvol_rw}" | grep -q 'OK'; then
-					# Execute and migrations available in the image to be deployed
-					execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}"
-
-					# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
-					if [ -f "${MOUNT_PATH}/root_uuid" ]; then
-						local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
-						sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
-					else
-						local disk=$(blkid -L frzr_root)
-						local root_uuid=$(blkid -s UUID -o value "${disk}p2")
-						sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
-					fi
+				# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
+				if [ -f "${MOUNT_PATH}/root_uuid" ]; then
+					local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
+					sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
+				else
+					local disk=$(blkid -L frzr_root)
+					local root_uuid=$(blkid -s UUID -o value "${disk}p2")
+					sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
 				fi
 			fi
 			echo "Entering Verify Case"
