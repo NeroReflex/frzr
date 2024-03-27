@@ -33,15 +33,15 @@ fresh_install() {
 
 	mkdir -p ${frzr_root}
 
-	if [ ! -z ${SWAP_GIB:-} ];
+	if [ ! -z ${SWAP_GIB:-} ]; then
 		declare -i SWAP_GIB=1
 	fi
 
-	if [ ! -z ${ROOT_GIB:-} ];
+	if [ ! -z ${ROOT_GIB:-} ]; then
 		declare -i ROOT_GIB=8
 	fi
 
-	if [ ! -z ${VAR_GIB:-} ];
+	if [ ! -z ${VAR_GIB:-} ]; then
 		declare -i VAR_GIB=4
 	fi
 
