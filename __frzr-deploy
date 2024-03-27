@@ -230,13 +230,13 @@ get_img_url() {
 # Note: this function can ignore amd-ucode and intel-ucode if those are not found since mkinitcpio will place those
 # in the initramfs and including them on systemd-boot is not deprecated.
 # $1 the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
-# $2 /boot mount path
-# $3 amd_ucode.img path relative to $2/$3/ (mind not inserting an initial /)
-# $4 intel_ucode.img path relative to $2/$3/ (mind not inserting an initial /)
-# $5 vmlinuz-linux path relative to $2/$3/ (mind not inserting an initial /)
-# $6 initramfs-linux.img path relative to $2/$3/ (mind not inserting an initial /)
+# $2 /efi mount path, the vfat partition (mind not inserting a final /)
+# $3 amd_ucode.img path relative to $2/$3/ (mind not inserting a final /)
+# $4 intel_ucode.img path relative to $2/$3/ (mind not inserting a final /)
+# $5 vmlinuz-linux path relative to $2/$3/ (mind not inserting a final /)
+# $6 initramfs-linux.img path relative to $2/$3/ (mind not inserting a final /)
 # $7 additional arguments to be used in the kernel cmdline
-# $8 entry config file name (mind not inserting an initial /)
+# $8 entry config file name (mind not inserting a final /)
 # stdout the configuration to be written to a systemd-boot entry to make the given deployment version bootable
 # return "OK" for success, an error string otherwise
 generate_systemd_boot_cfg() {
@@ -291,13 +291,13 @@ generate_systemd_boot_cfg() {
 			write_log "$FUNCNAME: initramfs has NOT been found at '$mount_path/$version/$initramfs'" 1
 
 			# return the error to be printed out
-			echo "ERROR: initramfs not found"
+			echo "ERROR: initramfs not found (searched at: '$mount_path/$version/$initramfs')"
 		fi
 	else
 		write_log "$FUNCNAME: vmlinuz (linux kernel) has been found at '$mount_path/$version/$vmlinuz'" 1
 
 		# return the error to be printed out
-		echo "ERROR: kernel not found"
+		echo "ERROR: kernel not found (searched at: '$mount_path/$version/$vmlinuz')"
 	fi
 }
 
@@ -380,12 +380,12 @@ execute_migrations() {
 # $1 the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
 # $2 /efi mount path
 # $3 the path to the deployment to be booted
-# $3 amd_ucode.img path relative to $2/$3/ (mind not inserting an initial /)
-# $4 intel_ucode.img path relative to $2/$3/ (mind not inserting an initial /)
-# $5 vmlinuz-linux path relative to $2/$3/ (mind not inserting an initial /)
-# $6 initramfs-linux.img path relative to $2/$3/ (mind not inserting an initial /)
-# $7 additional arguments to be used in the kernel cmdline
-# $8 entry config file name (mind not inserting an initial /)
+# $4 amd_ucode.img path relative to $2/$3/ (mind not inserting a final /)
+# $5 intel_ucode.img path relative to $2/$3/ (mind not inserting a final /)
+# $6 vmlinuz-linux path relative to $2/$3/ (mind not inserting a final /)
+# $7 initramfs-linux.img path relative to $2/$3/ (mind not inserting a final /)
+# $8 additional arguments to be used in the kernel cmdline
+# $9 entry config file name (mind not inserting a final /)
 # stdout the configuration to be written to a systemd-boot entry to make the given deployment version bootable
 # return "OK" for success, and error string otherwise"
 prepare_efi_partition() {
@@ -403,44 +403,54 @@ prepare_efi_partition() {
 	mkdir -p ${efi_root_path}/loader/entries
 
 	if [ -d "${efi_root_path}/loader/entries" ]; then
-		# each deployment will need its own kernel as well as initramfs to boot: place them in a EFI subdirectory
-		mkdir -p ${efi_root_path}/${version}
+		if [ -f ${deployment_root}/boot/${vmlinuz_name} ]; then
+			if [ -f ${deployment_root}/boot/${initramfs_name} ]; then
+				# each deployment will need its own kernel as well as initramfs to boot: place them in a EFI subdirectory
+				mkdir -p ${efi_root_path}/${version}
 
-		if [ -d "${efi_root_path}/${version}" ]; then
-			# Following steps copy kernel, initramfs and ucode to the EFI partition to be used on the next boot
-			cp ${deployment_root}/boot/vmlinuz-linux ${efi_root_path}/${version}/${vmlinuz_name}
-			cp ${deployment_root}/boot/initramfs-linux.img ${efi_root_path}/${version}/${initramfs_name}
+				if [ -d "${efi_root_path}/${version}" ]; then
+					# Following steps copy kernel, initramfs and ucode to the EFI partition to be used on the next boot
+					cp ${deployment_root}/boot/${vmlinuz_name} ${efi_root_path}/${version}/${vmlinuz_name}
+					cp ${deployment_root}/boot/${initramfs_name} ${efi_root_path}/${version}/${initramfs_name}
 
-			# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
-			local additional_arguments=""
-			if [ -f ${deployment_root}/usr/lib/frzr.d/bootconfig.conf ]; then
-				additional_arguments="$additional_arguments $(cat ${deployment_root}/usr/lib/frzr.d/bootconfig.conf)"
+					# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
+					local additional_arguments=""
+					if [ -f ${deployment_root}/usr/lib/frzr.d/bootconfig.conf ]; then
+						additional_arguments="$additional_arguments $(cat ${deployment_root}/usr/lib/frzr.d/bootconfig.conf)"
+					else
+						write_log "$FUNCNAME: File '${deployment_root}/usr/lib/frzr.d/bootconfig.conf' has not been found. No additional boot arguments will be set." 2
+					fi
+
+					local amd_ucode="amd-ucode.img"
+					if [ -e ${deployment_root}/boot/amd-ucode.img ]; then
+						cp ${deployment_root}/boot/amd-ucode.img ${efi_root_path}/${version}/${amd_ucode}
+					fi
+
+					local intel_ucode="intel-ucode.img"
+					if [ -e ${deployment_root}/boot/intel-ucode.img ]; then
+						cp ${deployment_root}/boot/intel-ucode.img ${efi_root_path}/${version}/${intel_ucode}
+					fi
+
+					local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${mount_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${boot_entry}")
+					echo "systemd-boot install: ${systemd_boot_update_result}"
+
+					if echo "${systemd_boot_update_result}" | grep -q 'OK'; then
+						echo "default ${boot_entry}" >${mount_path}/loader/loader.conf
+
+						echo "OK"
+					else
+						echo "${systemd_boot_update_result}"
+					fi
+				else
+					echo "ERROR: could not create path '${efi_root_path}/${version}' system will not be bootable"
+				fi
 			else
-				write_log "$FUNCNAME: File '${deployment_root}/usr/lib/frzr.d/bootconfig.conf' has not been found. No additional boot arguments will be set." 2
-			fi
-
-			local amd_ucode="amd-ucode.img"
-			if [ -e ${deployment_root}/boot/amd-ucode.img ]; then
-				cp ${deployment_root}/boot/amd-ucode.img ${efi_root_path}/${version}/${amd_ucode}
-			fi
-
-			local intel_ucode="intel-ucode.img"
-			if [ -e ${deployment_root}/boot/intel-ucode.img ]; then
-				cp ${deployment_root}/boot/intel-ucode.img ${efi_root_path}/${version}/${intel_ucode}
-			fi
-
-			local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${mount_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${boot_entry}")
-			echo "systemd-boot install: ${systemd_boot_update_result}"
-
-			if echo "${systemd_boot_update_result}" | grep -q 'OK'; then
-				echo "default ${boot_entry}" >${mount_path}/loader/loader.conf
-
-				echo "OK"
-			else
-				echo "${systemd_boot_update_result}"
+				# searched at should be mount/deployment/chimeraos_XX-YYYYYY/boot/initramfs-linux.img
+				echo "ERROR: Could not find initramfs (searched at: '$deployment_root/boot/$initramfs_name')"
 			fi
 		else
-			echo "ERROR: could not create path '${efi_root_path}/${version}' system will not be bootable"
+			# searched at should be mount/deployment/chimeraos_XX-YYYYYY/boot/vmlinuz-linux
+			echo "ERROR: Could not find vmlinuz (searched at: '$deployment_root/boot/$vmlinuz_name')"
 		fi
 	else
 		echo "ERROR: could not create path '${efi_root_path}/loader/entries' system will not be bootable"
@@ -529,7 +539,7 @@ main() {
 				sleep 5
 			fi
 
-			if ! mountpoint -q ${MOUNT_PATH}; then
+			if mountpoint -q ${MOUNT_PATH}; then
 				write_log "Using '${MOUNT_PATH}' as the main subvolume mount path"
 
 				DEPLOY_PATH=${MOUNT_PATH}/deployments
@@ -550,12 +560,20 @@ main() {
 				fi
 
 				# Check the "EFI System" partition is actually mounted
-				if ! mountpoint -q ${efi_root_path} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
+				if mountpoint -q ${efi_root_path} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
 					BOOT_CFG="${efi_root_path}/loader/entries/${deploy_systemd_boot_cfg}"
+					echo "Entering Download case"
+					STATE="DOWNLOAD"
+				else
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not bind ${efi_root_path} to frzr_efi (boot) partition"
+					STATE="FAIL"
 				fi
+			else
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not bind ${MOUNT_PATH} to frzr_root main subvolume"
+				STATE="FAIL"
 			fi
-			echo "Entering Download case"
-			STATE="DOWNLOAD"
 			;;
 		"DOWNLOAD")
 			TASK_STATE="DOWNLOAD"
@@ -598,7 +616,9 @@ main() {
 				if [ -z "$IMG_URL" ] || [ "$IMG_URL" == "null" ]; then
 					echo "No matching source found"
 					if curl --http1.1 -L -s "${RELEASES_URL}" | grep "rate limit" >/dev/null; then
-						echo "GitHub API rate limit exceeded"
+						TASK_ERROR=1
+						TASK_ERROR_MSG="GitHub API rate limit exceeded"
+						STATE="FAIL"
 					fi
 					STATE="FAIL"
 				fi
@@ -611,7 +631,8 @@ main() {
 				IMG_FILE="${MOUNT_PATH}/${FILE_NAME}"
 
 				if [ -e ${SUBVOL} ]; then
-					echo "${NAME} already installed; aborting"
+					TASK_ERROR=1
+					TASK_ERROR_MSG="${NAME} already installed; aborting"
 					STATE="FAIL"
 				fi
 
@@ -739,7 +760,7 @@ main() {
 					rm -rf /var/lib/pacman # undo frzr-unlock
 
 					# Activates the new deployed image by making it the default btrfs subvolume, therefore what a systemd-equipped initramfs will load
-					btrfs subvolume set-default 282 /
+					btrfs subvolume set-default 2800 / # TODO: fetch the correct ID
 
 					echo "deployment complete; restart to boot into ${NAME}"
 
