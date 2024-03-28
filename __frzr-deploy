@@ -790,15 +790,17 @@ main() {
 
 					rm -rf /var/lib/pacman # undo frzr-unlock
 
-					local subvolid=$(btrfs_subvol_get_id)
+					local subvolid=$(btrfs_subvol_get_id "$SUBVOL")
 
 					if echo "$subvolid" | grep -Fqx "ERROR"; then
 						TASK_ERROR=1
 						TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
 						STATE="FAIL"
 					else
+						echo "SubvolID: ${subvolid}"
+
 						# Activates the new deployed image by making it the default btrfs subvolume, therefore what a systemd-equipped initramfs will load
-						btrfs subvolume set-default $subvolid /
+						btrfs subvolume set-default "$subvolid" "${MOUNT_PATH}"
 
 						STATE="SUCCESS"
 					fi
