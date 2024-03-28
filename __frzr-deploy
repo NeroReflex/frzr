@@ -74,7 +74,7 @@ btrfs_subvolume_set_ro() {
 			btrfs property set -fts ${dir} ro true
 
 			local lock_state_after_set=$(btrfs property get -fts "$dir")
-			if [[ $lock_state == *"ro=true"* ]]; then
+			if [[ $lock_state_after_set == *"ro=true"* ]]; then
 				echo "OK"
 			else
 				echo "ERROR: the subvolume '$dir' is still readonly"
