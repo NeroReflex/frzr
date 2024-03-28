@@ -426,9 +426,13 @@ prepare_efi_partition() {
 				mkdir -p ${efi_root_path}/${version}
 
 				if [ -d "${efi_root_path}/${version}" ]; then
-					# Following steps copy kernel, initramfs and ucode to the EFI partition to be used on the next boot
-					cp ${deployment_root}/boot/${vmlinuz_name} ${efi_root_path}/${version}/${vmlinuz_name}
-					cp ${deployment_root}/boot/${initramfs_name} ${efi_root_path}/${version}/${initramfs_name}
+					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "systemd"; then
+						echo "systemd hook has boon found"
+					else
+						# TODO: see https://wiki.archlinux.org/title/Mkinitcpio
+						# TODO: use sed to add systemd hooks replacing udev, usr and resume, and sd-vconsole replacing consolefont and keymap
+						# TODO: use the image mkinitcpio to regenerate the initramfs
+					fi
 
 					# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
 					local additional_arguments=""
@@ -438,15 +442,27 @@ prepare_efi_partition() {
 						write_log "$FUNCNAME: File '${deployment_root}/usr/lib/frzr.d/bootconfig.conf' has not been found. No additional boot arguments will be set." 2
 					fi
 
-					local amd_ucode="amd-ucode.img"
-					if [ -e ${deployment_root}/boot/amd-ucode.img ]; then
-						cp ${deployment_root}/boot/amd-ucode.img ${efi_root_path}/${version}/${amd_ucode}
+					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "ucode"; then
+						echo "ucode hook has been found"
+					else
+						local amd_ucode="amd-ucode.img"
+						if [ -e ${deployment_root}/boot/amd-ucode.img ]; then
+							cp ${deployment_root}/boot/amd-ucode.img ${efi_root_path}/${version}/${amd_ucode}
+						fi
 					fi
 
-					local intel_ucode="intel-ucode.img"
-					if [ -e ${deployment_root}/boot/intel-ucode.img ]; then
-						cp ${deployment_root}/boot/intel-ucode.img ${efi_root_path}/${version}/${intel_ucode}
+					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "ucode"; then
+						echo "ucode hook has boon found"
+					else
+						local intel_ucode="intel-ucode.img"
+						if [ -e ${deployment_root}/boot/intel-ucode.img ]; then
+							cp ${deployment_root}/boot/intel-ucode.img ${efi_root_path}/${version}/${intel_ucode}
+						fi
 					fi
+
+					# Following steps copy kernel, initramfs and ucode to the EFI partition to be used on the next boot
+					cp ${deployment_root}/boot/${vmlinuz_name} ${efi_root_path}/${version}/${vmlinuz_name}
+					cp ${deployment_root}/boot/${initramfs_name} ${efi_root_path}/${version}/${initramfs_name}
 
 					local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${mount_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${boot_entry}")
 					echo "systemd-boot install: ${systemd_boot_update_result}"
@@ -713,7 +729,7 @@ main() {
 			echo "Deployment Set RW: ${set_subvol_rw}"
 			if echo "${set_subvol_rw}" | grep -q 'OK'; then
 				# Execute and migrations available in the image to be deployed
-				execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}"
+				execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
 
 				# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
 				if [ -f "${MOUNT_PATH}/root_uuid" ]; then
