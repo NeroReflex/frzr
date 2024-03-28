@@ -57,17 +57,17 @@ fresh_install() {
 
 	# create the GPT partition table and set the correct GPT type for each partition
 	parted --script ${disk} \
-	mklabel gpt \
-	mkpart primary fat32 1MiB 512MiB \
-	type 1 "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" \
-	set 1 esp on \
-	mkpart primary 512MiB ${ROOT_END}.5GiB \
-	type 2 "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709" \
-	mkpart primary linux-swap ${SWAP_START}.5 ${SWAP_END}.5GiB \
-	type 3 "0657fd6d-a4ab-43c4-84e5-0933c84b4f4f" \
-	
+		mklabel gpt \
+		mkpart primary fat32 1MiB 512MiB \
+		type 1 "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" \
+		set 1 esp on \
+		mkpart primary 512MiB ${ROOT_END}.5GiB \
+		type 2 "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709" \
+		mkpart primary linux-swap ${SWAP_START}.5 ${SWAP_END}.5GiB \
+		type 3 "0657fd6d-a4ab-43c4-84e5-0933c84b4f4f"
+
 	mkpart primary ${HOME_START}.5GiB 100% \
-	type 5 "933ac7e1-2eb4-4f13-b844-0e14e2aef915" \
+		type 5 "933ac7e1-2eb4-4f13-b844-0e14e2aef915"
 
 	# TODO: put var in a per-deployment subvolume
 	# mkpart primary ${VAR_START}.5GiB ${VAR_END}.5GiB \
@@ -116,10 +116,10 @@ fresh_install() {
 	bootctl --esp-path=${frzr_root}/efi/ install
 
 	# Write partition UUIDs into a file
-	echo "${swap_uuid}"	> ${frzr_root}/swap_uuid
-	echo "${root_uuid}"	> ${frzr_root}/root_uuid
-	echo "${var_uuid}"	> ${frzr_root}/var_uuid
-	echo "${home_uuid}"	> ${frzr_root}/home_uuid
+	echo "${swap_uuid}" >${frzr_root}/swap_uuid
+	echo "${root_uuid}" >${frzr_root}/root_uuid
+	echo "${var_uuid}" >${frzr_root}/var_uuid
+	echo "${home_uuid}" >${frzr_root}/home_uuid
 }
 
 if [ $EUID -ne 0 ]; then
@@ -127,58 +127,80 @@ if [ $EUID -ne 0 ]; then
 	exit 1
 fi
 
-MOUNT_PATH=/tmp/frzr_root
+RUNNING=true
+STATE="CHECK"
 
-device_list=()
-device_output=`lsblk --list -n -o name,model,size,type | grep disk | tr -s ' ' '\t'`
+while $RUNNING; do
+	case "$STATE" in
+	"CHECK")
+		echo "Checking for drives connected to the system"
+		MOUNT_PATH=/tmp/frzr_root
+		device_list=()
+		device_output=$(lsblk --list -n -o name,model,size,type | grep disk | tr -s ' ' '\t')
+		while read -r line; do
+			name=/dev/$(echo "$line" | cut -f 1)
+			model=$(echo "$line" | cut -f 2)
+			size=$(echo "$line" | cut -f 3)
+			device_list+=($name)
+			device_list+=("$model ($size)")
+		done <<<"$device_output"
+		DISK=$(whiptail --nocancel --menu "Choose a disk to install to:" 20 50 5 "${device_list[@]}" 3>&1 1>&2 2>&3)
+		echo "Checking for existing FRZR deployments"
+		# Checking for existing installation
 
-while read -r line; do
-	name=/dev/`echo "$line" | cut -f 1`
-	model=`echo "$line" | cut -f 2`
-	size=`echo "$line" | cut -f 3`
-	device_list+=($name)
-	device_list+=("$model ($size)")
-done <<< "$device_output"
+		if (lsblk -o label ${DISK} | grep -q frzr_efi); then
+			echo "Existing installation found"
 
-DISK=$(whiptail --nocancel --menu "Choose a disk to install to:" 20 50 5 "${device_list[@]}" 3>&1 1>&2 2>&3)
+			if (whiptail --yesno --yes-button "Repair" --no-button "Clean" "WARNING: $DISK appears to already have a system installed. Would you like to repair it or do a clean install?\n\nNOTE: A clean install will delete everything on the disk, but a repair install will preserve your user data." 13 70); then
+				echo "User chose to do a repair install"
+				STATE="REPAIR"
+			else
+				echo "User chose to do a clean install"
+				STATE="FORMAT"
+			fi
+		else
+			echo "Existing installation not found"
+			STATE="FORMAT"
+		fi
+		;;
+	"FORMAT")
+		echo "We are doing a fresh install"
 
-# Checking for existing installation
+		USERNAME=user
 
-REPAIR=false
+		if [ ! -z $1 ]; then
+			USERNAME=$1
+		fi
 
-if (lsblk -o label ${DISK} | grep -q frzr_efi); then
-    echo "Existing installation found"
-
-    if (whiptail --yesno --yes-button "Repair" --no-button "Clean" "WARNING: $DISK appears to already have a system installed. Would you like to repair it or do a clean install?\n\nNOTE: A clean install will delete everything on the disk, but a repair install will preserve your user data." 13 70); then
-        echo "User chose to do a repair install"
-        REPAIR=true
-    else
-        echo "User chose to do a clean install"
-    fi
-else
-    echo "Existing installation not found"
-fi
-
-
-
-
-
-if [ "${REPAIR}" == true ]; then ########## Doing a repair install
-	repair_install "${DISK}" "${MOUNT_PATH}"
-else ########## Doing a fresh install
-	if ! (whiptail --yesno "WARNING: $DISK will now be formatted. All data on the disk will be lost. Do you wish to proceed?" 10 50); then
-		echo "installation aborted"
-		exit 1
-	fi
-
-	USERNAME=user
-
-	if [ ! -z $1 ]; then
-		USERNAME=$1
-	fi
-
-	fresh_install "${DISK}" "${MOUNT_PATH}"
-fi
-
-
-
+		fresh_install "${DISK}" "${MOUNT_PATH}"
+		RESULT=$?
+		if [ $RESULT -eq 0 ]; then
+			STATE="SUCCESS"
+		else
+			STATE="Fail"
+		fi
+		;;
+	"REPAIR")
+		echo "We are doing a repair install"
+		repair_install "${DISK}" "${MOUNT_PATH}"
+		RESULT=$?
+		if [ $RESULT -eq 0 ]; then
+			STATE="SUCCESS"
+		else
+			STATE="Fail"
+		fi
+		;;
+	"SUCCESS")
+		echo "Successfully prepared the drive for an FRZR installation"
+		RUNNING=false
+		;;
+	"FAIL")
+		echo "The bootstrap failed"
+		RUNNING=false
+		;;
+	*)
+		echo "Something went terribly wrong"
+		RUNNING=false
+		;;
+	esac
+done
