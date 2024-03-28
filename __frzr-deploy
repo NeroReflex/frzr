@@ -87,6 +87,23 @@ btrfs_subvolume_set_ro() {
 	fi
 }
 
+# Ensure the subvolume is in RO state
+# PRE=
+# POST=
+# $1 the subvolume to be changed
+# stdout SubvolID on success, an error string otherwise
+btrfs_subvol_get_id() {
+	local dir=${1}
+
+	if is_btrfs_subvolume "$dir"; then
+		local subvolid=$(btrfs subvolume show $dir | grep "Subvolume ID:" | cut -d ':' -f 2 | tr -d '[:space:]')
+
+		echo $subvolid
+	else
+		echo "ERROR: $dir is not a valid btrfs subvolume"
+	fi
+}
+
 # Install the provided image file into the given deployment directory
 # $1 The path to the image file
 # $2 The path to the deployment directory
@@ -757,44 +774,41 @@ main() {
 
 					rm -rf /var/lib/pacman # undo frzr-unlock
 
-					# Activates the new deployed image by making it the default btrfs subvolume, therefore what a systemd-equipped initramfs will load
-					btrfs subvolume set-default 2800 / # TODO: fetch the correct ID
+					local subvolid=$(btrfs_subvol_get_id)
 
-					echo "deployment complete; restart to boot into ${NAME}"
+					if echo "$subvolid" | grep -Fqx "ERROR"; then
+						TASK_ERROR=1
+						TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
+						STATE="FAIL"
+					else
+						# Activates the new deployed image by making it the default btrfs subvolume, therefore what a systemd-equipped initramfs will load
+						btrfs subvolume set-default $subvolid /
 
-					# umount the efi path
-					umount -l ${efi_root_path}
-
-					# umount the frzr_root subvolume
-					umount -l ${MOUNT_PATH}
+						STATE="SUCCESS"
+					fi
 				else # the bootloader could not be updated
-					echo "deployment failed; could not update the EFI partition"
-
-					# umount the efi path
-					umount -l ${efi_root_path}
-
-					# umount the frzr_root subvolume
-					umount -l ${MOUNT_PATH}
-
-					exit 1
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not update the EFI partition"
+					STATE="FAIL"
 				fi
 			else # Image could not be set back to ro: this wouldn't be a problem, but indicates a greater problem and it's not safe to boot to it
-				echo "deployment failed; could not set the new image back in read-only state"
-
-				# umount the efi path
-				umount -l ${efi_root_path}
-
-				# umount the frzr_root subvolume
-				umount -l ${MOUNT_PATH}
-
-				exit 1
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not set the new image back in read-only state"
+				STATE="FAIL"
 			fi
-			cho "Entering Success Case"
-			STATE="SUCCESS"
+
+			# umount the efi path
+			umount -l ${efi_root_path}
+
+			# umount the frzr_root subvolume
+			umount -l ${MOUNT_PATH}
 			;;
 		"SUCCESS")
 			# This state should only be used if the installation completed without errors
 			TASK_STATE="SUCCESS"
+
+			echo "deployment complete; restart to boot into ${NAME}"
+
 			RUNNING=false
 			;;
 		"FAIL")
