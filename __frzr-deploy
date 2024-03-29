@@ -83,13 +83,13 @@ main() {
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
-			if ! mountpoint -q ${MOUNT_PATH}; then
+			if ! mountpoint -q ${MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
 				mkdir -p ${MOUNT_PATH}
 				mount -L frzr_root -t btrfs -o subvolid=5 ${MOUNT_PATH}
 				sleep 5
 			fi
 
-			if mountpoint -q ${MOUNT_PATH}; then
+			if mountpoint -q ${MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
 				write_log "Using '${MOUNT_PATH}' as the main subvolume mount path"
 
 				DEPLOY_PATH=${MOUNT_PATH}/deployments
@@ -275,19 +275,27 @@ main() {
 			;;
 		"VERIFY")
 			TASK_STATE="VERIFY"
-			# Verify the system installation status, check for device quirks, and prepare for cleanup
-			# Check if the FIRMWARE_OVERRIDE variable is set by the install media, if so enable firmware overrides
-			if [ -n "${FIRMWARE_OVERRIDE}" ]; then
-				echo "export USE_FIRMWARE_OVERRIDES=1" >${MOUNT_PATH}/etc/device-quirks.conf
+
+			# verify the subvolume integrity
+			if btrfs scrub start -Bdr "$SUBVOL"; then
+				# Verify the system installation status, check for device quirks, and prepare for cleanup
+				# Check if the FIRMWARE_OVERRIDE variable is set by the install media, if so enable firmware overrides
+				if [ -n "${FIRMWARE_OVERRIDE}" ]; then
+					echo "export USE_FIRMWARE_OVERRIDES=1" >${MOUNT_PATH}/etc/device-quirks.conf
+				fi
+
+				# Run frzr-tweaks to execute the device-quirks to be supplied by the deployed images
+				#frzr-tweaks # TODO: pass the root as an argument and in the script default to "/"
+
+				# Run frzr-initramfs to create mkinicpio.conf and build an initramfs
+				#frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
+				echo "Entering Cleanup Case"
+				STATE="CLEANUP"
+			else
+				TASK_ERROR=1
+				TASK_ERROR_MSG="FS check on btrfs subvolume '$SUBVOL' failed: image integrity compromised"
+				STATE="FAIL"
 			fi
-
-			# Run frzr-tweaks to execute the device-quirks to be supplied by the deployed images
-			#frzr-tweaks # TODO: pass the root as an argument and in the script default to "/"
-
-			# Run frzr-initramfs to create mkinicpio.conf and build an initramfs
-			#frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
-			echo "Entering Cleanup Case"
-			STATE="CLEANUP"
 			;;
 		"CLEANUP")
 			TASK_STATE="CLEANUP"
@@ -339,7 +347,10 @@ main() {
 					TASK_ERROR_MSG="Could not update the EFI partition"
 					STATE="FAIL"
 				fi
-			else # Image could not be set back to ro: this wouldn't be a problem, but indicates a greater problem and it's not safe to boot to it
+			else
+				# Image could not be set back to ro: this wouldn't be a problem
+				# but indicates a greater problem and it's not safe to boot to it
+				# furthermore an newly deployed image is expected to be read-only
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not set the new image back in read-only state"
 				STATE="FAIL"
