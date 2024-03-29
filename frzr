@@ -270,6 +270,9 @@ elif [ $function == "build-initramfs" ]; then
     source frzr-initramfs
 elif [ $function == "configure-tweaks" ]; then
     source frzr-tweaks
+elif [ $function == "package-options" ]; then
+    #User selected packages to be added to the install
+    source frzr-extras
 else
     echo "invalid argument"
 fi
