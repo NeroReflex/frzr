@@ -231,6 +231,14 @@ main() {
 				# skip this step: the subvolume has been created already
 				STATE="INSTALL"
 			else
+				# Use BTRFS receive to install the image
+				if [ -z ${SHOW_UI} ]; then
+					echo "installing ${NAME}..."
+				else
+					# TODO: verify if this really works
+					whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
+				fi
+
 				local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
 				if echo "${install_result}" | grep -q 'OK'; then
 					STATE="INSTALL"
@@ -243,12 +251,8 @@ main() {
 			;;
 		"INSTALL")
 			TASK_STATE="INSTALL"
-			# Use BTRFS receive to install the image
-			if [ -z ${SHOW_UI} ]; then
-				echo "installing ${NAME}..."
-			else
-				whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
-			fi
+			
+			echo "Entering Verify Case"
 
 			local vmlinuz_name="vmlinuz-linux"
 			local initramfs_name="initramfs-linux.img"
@@ -257,21 +261,38 @@ main() {
 			local set_subvol_rw=$(btrfs_subvolume_set_rw "${SUBVOL}")
 			echo "Deployment Set RW: ${set_subvol_rw}"
 			if echo "${set_subvol_rw}" | grep -q 'OK'; then
-				# Execute and migrations available in the image to be deployed
-				execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
+				# if image comes with /etc move that to /usr/etc
+				if [ -d "${SUBVOL}/etc" ]; then
+					mv "${SUBVOL}/etc" "${SUBVOL}/usr/etc"
+				fi
 
-				# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
-				if [ -f "${MOUNT_PATH}/root_uuid" ]; then
-					local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
-					sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
+				# manage /etc as a subvolume
+				if [ -f "${SUBVOL}/usr/etc" ]; then
+					btrfs snapshot create "${SUBVOL}/etc"
+					cp -a ${SUBVOL}/usr/etc/* "${SUBVOL}/etc/"
+				
+				
+
+					# Execute and migrations available in the image to be deployed
+					execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
+
+					# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
+					if [ -f "${MOUNT_PATH}/root_uuid" ]; then
+						local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
+						sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
+					else
+						local disk=$(blkid -L frzr_root)
+						local root_uuid=$(blkid -s UUID -o value "${disk}p2")
+						sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
+					fi
+
+					STATE="VERIFY"
 				else
-					local disk=$(blkid -L frzr_root)
-					local root_uuid=$(blkid -s UUID -o value "${disk}p2")
-					sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
+					TASK_ERROR=1
+					TASK_ERROR_MSG="No /etc directory found in the deployed image"
+					STATE="FAIL"
 				fi
 			fi
-			echo "Entering Verify Case"
-			STATE="VERIFY"
 			;;
 		"VERIFY")
 			TASK_STATE="VERIFY"
