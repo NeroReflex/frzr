@@ -225,7 +225,21 @@ main() {
 			# Extract tar of system image
 			# This step might not ever need to be used, but left here depending on the occasion it may be needed.
 			echo "Entering Install Case"
-			STATE="INSTALL"
+
+			# Write the deployment image to disk (if it was not being done already by the download step)
+			if is_btrfs_subvolume "$SUBVOL"; then
+				# skip this step: the subvolume has been created already
+				STATE="INSTALL"
+			else
+				local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
+				if echo "${install_result}" | grep -q 'OK'; then
+					STATE="INSTALL"
+				else
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Error extracting the deployment image"
+					STATE="FAIL"
+				fi
+			fi
 			;;
 		"INSTALL")
 			TASK_STATE="INSTALL"
@@ -236,8 +250,6 @@ main() {
 				whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
 			fi
 
-			# Write the deployment image to disk
-			local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
 			local vmlinuz_name="vmlinuz-linux"
 			local initramfs_name="initramfs-linux.img"
 
@@ -295,6 +307,7 @@ main() {
 					rm -rf ${MOUNT_PATH}/boot/${deployment_to_be_removed}
 				fi
 			fi
+
 			# Migrations have been executed, frzr-tweaks and frzr-initramfs have been run: set the deployment subvolume back to being RO
 			local set_subvol_ro=$(btrfs_subvolume_set_ro "${SUBVOL}")
 			echo "Deployment Set RO: ${set_subvol_ro}"
