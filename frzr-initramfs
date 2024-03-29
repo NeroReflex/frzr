@@ -15,12 +15,15 @@ while $RUNNING; do
         if [ $UPGRADE -eq 1 ]; then
             echo "Doing an upgrade"
             STATE="UPGRADE"
-        elif [ ! -z "${SUBVOL}" ]; then
-            echo "Running frzr-initramfs manually"
-            STATE="MANUAL"
-        elif [ -d "${SUBVOL}" ]; then
+        elif [ $UPGRADE -eq 0 ]; then
             echo "Doing a first time install"
             STATE="INSTALL"
+        elif [ -d /frzr_root ]; then
+            echo "Running frzr-initramfs manually"
+            STATE="MANUAL"
+        else
+            echo "We failed our checks. FAIL!"
+            STATE="FAIL"
         fi
         ;;
     "INSTALL")

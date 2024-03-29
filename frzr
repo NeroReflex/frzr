@@ -60,15 +60,15 @@ frzr_chroot() {
     mount -t sysfs /sys sys/
     mount --rbind /dev dev/
 
-    chroot ${SUBVOL} /bin/bash $CHROOT_CMD
+    chroot ${CHROOT_PATH} /bin/bash -c $CHROOT_CMD
 }
 
 frzr_undo_chroot() {
     local CHROOT_PATH=$1
-    umount -l ${SUBVOL}/proc
-    umount -l ${SUBVOL}/sys
-    mount --make-rslave ${SUBVOL}/dev
-    umount -l ${SUBVOL}/dev
+    umount -l ${CHROOT_PATH}/proc
+    umount -l ${CHROOT_PATH}/sys
+    mount --make-rslave ${CHROOT_PATH}/dev
+    umount -l ${CHROOT_PATH}/dev
 }
 
 # Check if the given directory is a btrfs subvolume
