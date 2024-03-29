@@ -13,15 +13,19 @@ while $RUNNING; do
     "BEGIN")
         # Check whether this is an install, upgrade, or manual run
         if [ $UPGRADE -eq 1 ]; then
+            echo "Doing an upgrade"
             STATE="UPGRADE"
         elif [ ! -z "${SUBVOL}" ]; then
+            echo "Running frzr-initramfs manually"
             STATE="MANUAL"
         elif [ -d "${SUBVOL}" ]; then
+            echo "Doing a first time install"
             STATE="INSTALL"
         fi
         ;;
     "INSTALL")
         # We are doing a fresh new install
+        echo "We are doing an rebuild within an installer"
         cd ${SUBVOL}
         COMMAND=$(
             cat <<'EOF'
@@ -40,14 +44,17 @@ EOF
         )
         # Set R/W permissions
         btrfs_subvolume_set_rw ${SUBVOL}
+        echo "Entering chroot at ${SUBVOL}"
         frzr_chroot $SUBVOL $COMMAND
         # Set back to R/O permissions
         btrfs_subvolume_set_ro ${SUBVOL}
+        echo "Exiting chroot at ${SUBVOL}"
         frzr_undo_chroot ${SUBVOL}
         STATE="SUCCESS"
         ;;
     "UPGRADE")
         # We are doing an upgrade to an existing system
+        echo "We're doing an upgrade operation"
         ### Grabbing name of the currently deployed system
         ID=$(grep '^ID=' "$SUBVOL/etc/os-release" | awk -F= '{ print $2 }' | sed 's/"//g')
         VERSIONID=$(grep '^VERSION_ID=' "$SUBVOL/etc/os-release" | awk -F= '{ print $2 }' | sed 's/"//g')
@@ -87,14 +94,17 @@ EOF
         )
         # Set R/W permissions
         btrfs_subvolume_set_rw ${SUBVOL}
+        echo "Entering chroot at ${SUBVOL}"
         frzr_chroot $SUBVOL $COMMAND
         # Set back to R/O permissions
         btrfs_subvolume_set_ro ${SUBVOL}
+        echo "Exiting chroot at ${SUBVOL}"
         frzr_undo_chroot ${SUBVOL}
 
         STATE="CLEANUP"
         ;;
     "MANUAL")
+        echo "Looks like were not doing an install or upgrade. Rebuilding local initramfs"
         # If frzr is not running and the user is triggering a rebuild manually
         ### Grabbing name of the currently deployed system
         ID=$(grep '^ID=' /etc/os-release | awk -F= '{ print $2 }' | sed 's/"//g')
