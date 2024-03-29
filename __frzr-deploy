@@ -87,6 +87,23 @@ btrfs_subvolume_set_ro() {
 	fi
 }
 
+# Ensure the subvolume is in RO state
+# PRE=
+# POST=
+# $1 the subvolume to be changed
+# stdout SubvolID on success, an error string otherwise
+btrfs_subvol_get_id() {
+	local dir=${1}
+
+	if is_btrfs_subvolume "$dir"; then
+		local subvolid=$(btrfs subvolume show $dir | grep "Subvolume ID:" | cut -d ':' -f 2 | tr -d '[:space:]')
+
+		echo $subvolid
+	else
+		echo "ERROR: $dir is not a valid btrfs subvolume"
+	fi
+}
+
 # Install the provided image file into the given deployment directory
 # $1 The path to the image file
 # $2 The path to the deployment directory
@@ -409,9 +426,13 @@ prepare_efi_partition() {
 				mkdir -p ${efi_root_path}/${version}
 
 				if [ -d "${efi_root_path}/${version}" ]; then
-					# Following steps copy kernel, initramfs and ucode to the EFI partition to be used on the next boot
-					cp ${deployment_root}/boot/${vmlinuz_name} ${efi_root_path}/${version}/${vmlinuz_name}
-					cp ${deployment_root}/boot/${initramfs_name} ${efi_root_path}/${version}/${initramfs_name}
+					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "systemd"; then
+						echo "systemd hook has boon found"
+					else
+						# TODO: see https://wiki.archlinux.org/title/Mkinitcpio
+						# TODO: use sed to add systemd hooks replacing udev, usr and resume, and sd-vconsole replacing consolefont and keymap
+						# TODO: use the image mkinitcpio to regenerate the initramfs
+					fi
 
 					# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
 					local additional_arguments=""
@@ -421,15 +442,27 @@ prepare_efi_partition() {
 						write_log "$FUNCNAME: File '${deployment_root}/usr/lib/frzr.d/bootconfig.conf' has not been found. No additional boot arguments will be set." 2
 					fi
 
-					local amd_ucode="amd-ucode.img"
-					if [ -e ${deployment_root}/boot/amd-ucode.img ]; then
-						cp ${deployment_root}/boot/amd-ucode.img ${efi_root_path}/${version}/${amd_ucode}
+					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "ucode"; then
+						echo "ucode hook has been found"
+					else
+						local amd_ucode="amd-ucode.img"
+						if [ -e ${deployment_root}/boot/amd-ucode.img ]; then
+							cp ${deployment_root}/boot/amd-ucode.img ${efi_root_path}/${version}/${amd_ucode}
+						fi
 					fi
 
-					local intel_ucode="intel-ucode.img"
-					if [ -e ${deployment_root}/boot/intel-ucode.img ]; then
-						cp ${deployment_root}/boot/intel-ucode.img ${efi_root_path}/${version}/${intel_ucode}
+					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "ucode"; then
+						echo "ucode hook has boon found"
+					else
+						local intel_ucode="intel-ucode.img"
+						if [ -e ${deployment_root}/boot/intel-ucode.img ]; then
+							cp ${deployment_root}/boot/intel-ucode.img ${efi_root_path}/${version}/${intel_ucode}
+						fi
 					fi
+
+					# Following steps copy kernel, initramfs and ucode to the EFI partition to be used on the next boot
+					cp ${deployment_root}/boot/${vmlinuz_name} ${efi_root_path}/${version}/${vmlinuz_name}
+					cp ${deployment_root}/boot/${initramfs_name} ${efi_root_path}/${version}/${initramfs_name}
 
 					local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${mount_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${boot_entry}")
 					echo "systemd-boot install: ${systemd_boot_update_result}"
@@ -696,7 +729,7 @@ main() {
 			echo "Deployment Set RW: ${set_subvol_rw}"
 			if echo "${set_subvol_rw}" | grep -q 'OK'; then
 				# Execute and migrations available in the image to be deployed
-				execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}"
+				execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
 
 				# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
 				if [ -f "${MOUNT_PATH}/root_uuid" ]; then
@@ -757,44 +790,43 @@ main() {
 
 					rm -rf /var/lib/pacman # undo frzr-unlock
 
-					# Activates the new deployed image by making it the default btrfs subvolume, therefore what a systemd-equipped initramfs will load
-					btrfs subvolume set-default 2800 / # TODO: fetch the correct ID
+					local subvolid=$(btrfs_subvol_get_id "$SUBVOL")
 
-					echo "deployment complete; restart to boot into ${NAME}"
+					if echo "$subvolid" | grep -Fqx "ERROR"; then
+						TASK_ERROR=1
+						TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
+						STATE="FAIL"
+					else
+						echo "SubvolID: ${subvolid}"
 
-					# umount the efi path
-					umount -l ${efi_root_path}
+						# Activates the new deployed image by making it the default btrfs subvolume, therefore what a systemd-equipped initramfs will load
+						btrfs subvolume set-default "$subvolid" "${MOUNT_PATH}"
 
-					# umount the frzr_root subvolume
-					umount -l ${MOUNT_PATH}
+						STATE="SUCCESS"
+					fi
 				else # the bootloader could not be updated
-					echo "deployment failed; could not update the EFI partition"
-
-					# umount the efi path
-					umount -l ${efi_root_path}
-
-					# umount the frzr_root subvolume
-					umount -l ${MOUNT_PATH}
-
-					exit 1
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not update the EFI partition"
+					STATE="FAIL"
 				fi
 			else # Image could not be set back to ro: this wouldn't be a problem, but indicates a greater problem and it's not safe to boot to it
-				echo "deployment failed; could not set the new image back in read-only state"
-
-				# umount the efi path
-				umount -l ${efi_root_path}
-
-				# umount the frzr_root subvolume
-				umount -l ${MOUNT_PATH}
-
-				exit 1
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not set the new image back in read-only state"
+				STATE="FAIL"
 			fi
-			cho "Entering Success Case"
-			STATE="SUCCESS"
+
+			# umount the efi path
+			umount -l ${efi_root_path}
+
+			# umount the frzr_root subvolume
+			umount -l ${MOUNT_PATH}
 			;;
 		"SUCCESS")
 			# This state should only be used if the installation completed without errors
 			TASK_STATE="SUCCESS"
+
+			echo "deployment complete; restart to boot into ${NAME}"
+
 			RUNNING=false
 			;;
 		"FAIL")
