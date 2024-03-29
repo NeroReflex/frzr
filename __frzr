@@ -52,7 +52,7 @@ btrfs_subvolume_set_rw() {
 			echo "OK"
 		fi
 	else
-		echo "EROR: the given argument '$dir' is not a btrfs subvolume"
+		echo "ERROR: the given argument '$dir' is not a btrfs subvolume"
 	fi
 }
 
@@ -79,7 +79,7 @@ btrfs_subvolume_set_ro() {
 			echo "OK"
 		fi
 	else
-		echo "EROR: the given argument '$dir' is not a btrfs subvolume"
+		echo "ERROR: the given argument '$dir' is not a btrfs subvolume"
 	fi
 }
 
