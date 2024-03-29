@@ -1,48 +1,141 @@
 #! /bin/bash
 
-
 set -Ee
 # Tracker file directory
 TRACKER_FILE_DIR="/tmp/"
 
 # Signals
 TASK_STATE=""
-TASK_MSG="" # TASK_MSG will be read by external tools. EX TASK_MSG="Preparing user directory"
-TASK_TRACKER=0 # TASK_TRACKER will be used to signal back that the current TASK_MSG in queue is handled or not 0 = Pending 1 = Completed
-TASK_ERROR=0 # Signal to let listeners know that the task had an error.
-TASK_ERROR_MSG="" # Error message. EX: "Unexpected I/O errors found during write"
-TASK_WARNING=0 # Signal to let listeners know there is a warning
+TASK_MSG=""         # TASK_MSG will be read by external tools. EX TASK_MSG="Preparing user directory"
+TASK_TRACKER=0      # TASK_TRACKER will be used to signal back that the current TASK_MSG in queue is handled or not 0 = Pending 1 = Completed
+TASK_ERROR=0        # Signal to let listeners know that the task had an error.
+TASK_ERROR_MSG=""   # Error message. EX: "Unexpected I/O errors found during write"
+TASK_WARNING=0      # Signal to let listeners know there is a warning
 TASK_WARNING_MSG="" # Warning message. EX: "BTRFS filesystem was supposed to be locked, but it was already unlocked. Continuing.."
 
 # Check for exported variables provided by an installer script
 if [ -z $TARGET ]; then
-   TARGET="" # Set to the target deployment channel. This should only be set by the installer script
+    TARGET="" # Set to the target deployment channel. This should only be set by the installer script
 fi
 
 if [ -z $LOCAL_INSTALL ]; then
-   LOCAL_INSTALL=0 # Set to 1 to perform a local media install. This should be set by the installer script
+    LOCAL_INSTALL=0 # Set to 1 to perform a local media install. This should be set by the installer script
 fi
 
 if [ -z $SHOW_UI ]; then
-   SHOW_UI=0 # Show the whiptail UI. This is used to show the installation and extraction progress. This should be set only by the installer script.
+    SHOW_UI=0 # Show the whiptail UI. This is used to show the installation and extraction progress. This should be set only by the installer script.
 fi
 
 # Define all public variables to be used here and in all sourced scripts
+UPGRADE=0
 REPAIR_INSTALL=0 # Set to 1 if you want to do a repair install. This should be set by frzr-bootstrap later if an existing install is found.
-NAME="" # Name of the OS to be deployed
-MOUNT_PATH="" # This is set as /tmp/frzr_root/ in the installer and /frzr_root during upgrades
+NAME=""          # Name of the OS to be deployed
+MOUNT_PATH=""    # This is set as /tmp/frzr_root/ in the installer and /frzr_root during upgrades
 SUBVOL=""
 DEPLOY_PATH="" # ${MOUNT_PATH}/deployments
 FRZR_CHECK_UPDATE=0
 FRZR_PARAMS=""
 FILE_NAME="" # The file name downloaded from the repo
-IMG_NAME="" # Path to the downloaded image to be deployed. It gets set by "${MOUNT_PATH}/${FILE_NAME}"
+IMG_NAME=""  # Path to the downloaded image to be deployed. It gets set by "${MOUNT_PATH}/${FILE_NAME}"
 BASE_URL=""
-REPO="" # Github repo
+REPO=""    # Github repo
 CHANNEL="" # The target channel to download the image from. Stable/Testing/Unstable
 RELEASES_URL=""
 EXPECTED_CHECKSUM="" # Expected checksum value of downloaded file
-ACTUAL_CHECKSUM="" # Actual checksum of the file downloaded
+ACTUAL_CHECKSUM=""   # Actual checksum of the file downloaded
+
+frzr_check_bootenv() {
+    if [ -d /tmp/frzr_root ]; then
+        UPGRADE=0
+    else
+        UPGRADE=1
+    fi
+}
+
+frzr_chroot() {
+    local CHROOT_PATH=$1
+    local CHROOT_CMD=$2
+
+    mount -t proc /proc proc/
+    mount -t sysfs /sys sys/
+    mount --rbind /dev dev/
+
+    chroot ${SUBVOL} /bin/bash $CHROOT_CMD
+}
+
+frzr_undo_chroot() {
+    local CHROOT_PATH=$1
+    umount -l ${SUBVOL}/proc
+    umount -l ${SUBVOL}/sys
+    mount --make-rslave ${SUBVOL}/dev
+    umount -l ${SUBVOL}/dev
+}
+
+# Check if the given directory is a btrfs subvolume
+# $1 the directory
+# return 0 if the directory is a subvolume, 1 otherwise
+is_btrfs_subvolume() {
+	local dir=$1
+	[ "$(stat -f --format="%T" "$dir")" == "btrfs" ] || return 1
+	inode="$(stat --format="%i" "$dir")"
+	case "$inode" in
+	2 | 256)
+		return 0
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
+btrfs_subvolume_set_rw() {
+    local dir=${1}
+
+    if is_btrfs_subvolume "$dir"; then
+        local lock_state=$(btrfs property get -fts "$dir")
+        if [[ $lock_state == *"ro=true"* ]]; then
+            btrfs property set -fts ${dir} ro false
+
+            local lock_state_after_set=$(btrfs property get -fts "$dir")
+            if [[ $lock_state_after_set == *"ro=false"* ]]; then
+                echo "OK"
+            else
+                echo "ERROR: the subvolume '$dir' is still readonly"
+            fi
+        else
+            echo "OK"
+        fi
+    else
+        echo "EROR: the given argument '$dir' is not a btrfs subvolume"
+    fi
+}
+
+# Ensure the subvolume is in RO state
+# PRE=
+# POST=the directory is a btrfs subvolume in RO state
+# $1 the subvolume to be changed
+# stdout "OK" on success, an error string otherwise
+btrfs_subvolume_set_ro() {
+    local dir=${1}
+
+    if is_btrfs_subvolume "$dir"; then
+        local lock_state=$(btrfs property get -fts "$dir")
+        if [[ $lock_state == *"ro=false"* ]]; then
+            btrfs property set -fts ${dir} ro true
+
+            local lock_state_after_set=$(btrfs property get -fts "$dir")
+            if [[ $lock_state_after_set == *"ro=true"* ]]; then
+                echo "OK"
+            else
+                echo "ERROR: the subvolume '$dir' is still readonly"
+            fi
+        else
+            echo "OK"
+        fi
+    else
+        echo "EROR: the given argument '$dir' is not a btrfs subvolume"
+    fi
+}
 
 frzr_status() {
     # Output frzr status tracker using the JSON format
@@ -82,18 +175,18 @@ EOF
 trap frzr_status SIGINT SIGTERM ERR
 
 frzr_check() {
-local result=$1
-if [ $result == 0 ]; then
-   value="✓"
-else
-   value="✗"
-fi
+    local result=$1
+    if [ $result == 0 ]; then
+        value="✓"
+    else
+        value="✗"
+    fi
 
-echo $value
+    echo $value
 }
 
-write_tracker_file(){
-   frzr_status > "$TRACKER_FILE_DIR/frzr.tracker"
+write_tracker_file() {
+    frzr_status >"$TRACKER_FILE_DIR/frzr.tracker"
 }
 
 # Define a function to handle errors
@@ -101,13 +194,13 @@ handle_error() {
     local function_name="$1"
     local line_number="$2"
     local command="$3"
-    
+
     echo "Error occurred in function '${function_name}' on line ${line_number}. Command: '${command}'"
-    
+
     frzr_status
-    
+
     if [ -f /tmp/frzr.lock ]; then
-       rm /tmp/frzr.lock
+        rm /tmp/frzr.lock
     fi
 }
 
@@ -116,11 +209,11 @@ trap 'handle_error "${FUNCNAME[0]}" "$LINENO" "$BASH_COMMAND"' ERR
 
 # Begin execution
 if [ $EUID -ne 0 ]; then
-	echo "$(basename $0) must be run as root"
-	exit 1
+    echo "$(basename $0) must be run as root"
+    exit 1
 fi
 
-if [ $# -eq 0  ]; then
+if [ $# -eq 0 ]; then
     echo "Frzr requires at least one argument. Use frzr help for usage"
     exit
 fi
@@ -150,7 +243,7 @@ elif [ $function == "upgrade" ]; then
     # Create the lock file
     touch /tmp/frzr.lock
 
-    # Source the script
+    frzr_check_bootenv
     source "${BASH_SOURCE%/*}/__frzr-deploy" "$@"
     RESULT=$?
 
@@ -158,8 +251,6 @@ elif [ $function == "upgrade" ]; then
     rm -f /tmp/frzr.lock
 
     exit $RESULT
-elif [ $function == "version" ]; then
-    echo "version"
 elif [ $function == "version" ]; then
     echo "frzr-release"
     #source frzr-release
@@ -171,15 +262,11 @@ elif [ $function == "get-channel" ]; then
     #echo ${FRZR_ROOT}/source
 elif [ $function == "build-initramfs" ]; then
     echo "frzr-initramfs"
-     #source frzr-initramfs
+    #source frzr-initramfs
 elif [ $function == "configure-tweaks" ]; then
     echo "frzr-tweaks"
-     #source frzr-tweaks
+    #source frzr-tweaks
 else
-   echo "invalid argument"
+    echo "invalid argument"
 fi
-
-
-
-
 

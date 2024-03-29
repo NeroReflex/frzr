@@ -5,114 +5,87 @@ if [ $EUID -ne 0 ]; then
     exit 1
 fi
 
-# Check if script is being ran frmo the install media
-if [ -d /tmp/frzr_root ]; then
-    
-    if [ -d "${SUBVOL}" ]; then
-        
+RUNNING=true
+STATE="BEGIN"
+
+while $RUNNING; do
+    case "$STATE" in
+    "BEGIN")
+        # Check whether this is an install, upgrade, or manual run
+        if [ ! -z "$UPGRADE" ]; then
+            STATE="UPGRADE"
+        elif [ ! -z "${SUBVOL}" ]; then
+            STATE="MANUAL"
+        elif [ -d "${SUBVOL}" ]; then
+            STATE="INSTALL"
+        fi
+        ;;
+    "INSTALL")
+        # We are doing a fresh new install
         cd ${SUBVOL}
-        # Mount necessary file systems
-        mount -t proc /proc proc/
-        mount -t sysfs /sys sys/
-        mount --rbind /dev dev/
-        
+        COMMAND="" #TODO Set this command value
         # Set R/W permissions
-        btrfs property set -fts ${SUBVOL} ro false
-	chroot ${SUBVOL} /bin/bash <<EOF
-# Commands to be ran in chroot
-
-### Create distro mkinitcpio preset
-echo '
-ALL_config="/etc/mkinitcpio.conf"
-ALL_kver="/boot/vmlinuz-linux"
-ALL_microcode=(/boot/*-ucode.img)
-
-PRESETS="default"
-
-default_image="/boot/initramfs-linux.img"
-' > /etc/mkinitcpio.d/\${NAME%%-*}.preset
-
-### Rebuild Initramfs with custom preset
-mkinitcpio -p \${NAME%%-*}
-EOF
+        btrfs_subvolume_set_rw ${SUBVOL}
+        frzr_chroot $SUBVOL $COMMAND
         # Set back to R/O permissions
-        btrfs property set -fts ${SUBVOL} ro true
-	# unmount filesystems
-	umount -l ${SUBVOL}/proc
-    	umount -l ${SUBVOL}/sys
-    	mount --make-rslave ${SUBVOL}/dev
-    	umount -l ${SUBVOL}/dev
-    else
-        echo "No deployment directory found"
-        exit 1
-    fi
-else
-    echo "We don't appear to be running from an arch install media"
-fi
-
-
-# Build initramfs from within a deployed system
-if [ -d /frzr_root ]; then
-
-    if [ -n "$SUBVOL" ]; then
-        ### Grabbing name of the new deployed system
+        btrfs_subvolume_set_ro ${SUBVOL}
+        frzr_undo_chroot ${SUBVOL}
+        STATE="SUCCESS"
+        ;;
+    "UPGRADE")
+        # We are doing an upgrade to an existing system
+        ### Grabbing name of the currently deployed system
         ID=$(grep '^ID=' "$SUBVOL/etc/os-release" | awk -F= '{ print $2 }' | sed 's/"//g')
         VERSIONID=$(grep '^VERSION_ID=' "$SUBVOL/etc/os-release" | awk -F= '{ print $2 }' | sed 's/"//g')
         BUILDID=$(grep '^BUILD_ID=' "$SUBVOL/etc/os-release" | awk -F= '{ print $2 }' | sed 's/"//g')
-    else
+
+        BUILD="$ID"-"$VERSIONID"_"$BUILDID"
+        DEPLOYMENT_PATH="/frzr_root/deployments/$BUILD"
+
+        # Get locked state
+        RELOCK=0
+        LOCK_STATE=$(btrfs property get -fts "$DEPLOYMENT_PATH")
+        if [[ $LOCK_STATE == *"ro=true"* ]]; then
+            btrfs_subvolume_set_rw ${DEPLOYMENT_PATH}
+            RELOCK=1
+        else
+            echo "Filesystem appears to be unlocked"
+        fi
+
+        echo "Generating configuration for $BUILD"
+
+        ### Rebuild Initramfs with custom preset
+        cd ${SUBVOL}
+        COMMAND="" #TODO Set this command value
+        # Set R/W permissions
+        btrfs_subvolume_set_rw ${SUBVOL}
+        frzr_chroot $SUBVOL $COMMAND
+        # Set back to R/O permissions
+        btrfs_subvolume_set_ro ${SUBVOL}
+        frzr_undo_chroot ${SUBVOL}
+
+        STATE="CLEANUP"
+        ;;
+    "MANUAL")
+        # If frzr is not running and the user is triggering a rebuild manually
         ### Grabbing name of the currently deployed system
         ID=$(grep '^ID=' /etc/os-release | awk -F= '{ print $2 }' | sed 's/"//g')
         VERSIONID=$(grep '^VERSION_ID=' /etc/os-release | awk -F= '{ print $2 }' | sed 's/"//g')
         BUILDID=$(grep '^BUILD_ID=' /etc/os-release | awk -F= '{ print $2 }' | sed 's/"//g')
-    fi
 
-    BUILD="$ID"-"$VERSIONID"_"$BUILDID"
-    DEPLOYMENT_PATH="/frzr_root/deployments/$BUILD"
-    
-    # Get locked state
-    RELOCK=0
-    LOCK_STATE=$(btrfs property get -fts "$DEPLOYMENT_PATH")
-    if [[ $LOCK_STATE == *"ro=true"* ]]; then
-        btrfs property set -fts ${DEPLOYMENT_PATH} ro false
-        RELOCK=1
-    else
-        echo "Filesystem appears to be unlocked"
-    fi
-    
-    echo "Generating configuration for $BUILD"
-    
-    ### Rebuild Initramfs with custom preset
-    
-    if [ -n "$SUBVOL" ]; then
-        cd ${SUBVOL}
-        # Mount necessary file systems
-        mount -t proc /proc proc/
-        mount -t sysfs /sys sys/
-        mount --rbind /dev dev/
+        BUILD="$ID"-"$VERSIONID"_"$BUILDID"
+        DEPLOYMENT_PATH="/frzr_root/deployments/$BUILD"
 
-	# We have to chroot for new images or else the kernel version can cause initramfs building to fail
-	chroot ${SUBVOL} /bin/bash <<EOF
-# Commands to be ran in chroot
-### Create distro mkinitcpio preset
-echo '
-ALL_config="/etc/mkinitcpio.conf"
-ALL_kver="/boot/vmlinuz-linux"
-ALL_microcode=(/boot/*-ucode.img)
-
-PRESETS="default"
-
-default_image="/boot/initramfs-linux.img"
-' > /etc/mkinitcpio.d/\${NAME%%-*}.preset
-
-### Rebuild Initramfs with custom preset
-mkinitcpio -p \${NAME%%-*}
-EOF
-    umount -l ${SUBVOL}/proc
-    umount -l ${SUBVOL}/sys
-    mount --make-rslave ${SUBVOL}/dev
-    umount -l ${SUBVOL}/dev
-    else
-       echo '
+        # Get locked state
+        RELOCK=0
+        LOCK_STATE=$(btrfs property get -fts "$DEPLOYMENT_PATH")
+        if [[ $LOCK_STATE == *"ro=true"* ]]; then
+            btrfs_subvolume_set_rw ${DEPLOYMENT_PATH}
+            RELOCK=1
+        else
+            echo "Filesystem appears to be unlocked"
+        fi
+        echo '
 ALL_config="/etc/mkinitcpio.conf"
 ALL_kver="/boot/'$BUILD'/vmlinuz-linux"
 ALL_microcode=(/boot/'$BUILD'/*-ucode.img)
@@ -120,15 +93,32 @@ ALL_microcode=(/boot/'$BUILD'/*-ucode.img)
 PRESETS="default"
 
 default_image="/boot/'$BUILD'/initramfs-linux.img"
-' > /etc/mkinitcpio.d/$ID.preset
-       # If we are not doing a deployment then this will be used for local installs to rebuild initramfs
-       mkinitcpio -p $ID
-    fi
-    
-    if [[ $RELOCK == 1 ]]; then
-       btrfs property set -fts ${DEPLOYMENT_PATH} ro true
-    else
-       # Move rebuilt images to the unlocked location if system was unlocked prior
-       cp /boot/$BUILD/* /boot
-    fi
-fi
+' >/etc/mkinitcpio.d/$ID.preset
+        # If we are not doing a deployment then this will be used for local installs to rebuild initramfs
+        mkinitcpio -p $ID
+        STATE="CLEANUP"
+        ;;
+    "CLEANUP")
+        if [[ $RELOCK == 1 ]]; then
+            btrfs_subvolume_set_ro ${SUBVOL}
+        else
+            # Move rebuilt images to the unlocked location if system was unlocked prior
+            cp /boot/$BUILD/* /boot
+        fi
+        STATE="SUCCESS"
+        ;;
+    "SUCCESS")
+    	echo "The initramfs rebuild was successful"
+        RUNNING=false
+        ;;
+    "FAIL")
+    	echo "There were errors while attempting to rebuild the initramfs"
+        RUNNING=false
+        ;;
+    *)
+        echo "Something went terribly wrong"
+        echo $STATE
+        RUNNING=false
+        ;;
+    esac
+done
