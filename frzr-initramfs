@@ -12,7 +12,7 @@ while $RUNNING; do
     case "$STATE" in
     "BEGIN")
         # Check whether this is an install, upgrade, or manual run
-        if [ ! -z "$UPGRADE" ]; then
+        if [ $UPGRADE -eq 1 ]; then
             STATE="UPGRADE"
         elif [ ! -z "${SUBVOL}" ]; then
             STATE="MANUAL"
@@ -23,7 +23,21 @@ while $RUNNING; do
     "INSTALL")
         # We are doing a fresh new install
         cd ${SUBVOL}
-        COMMAND="" #TODO Set this command value
+        COMMAND=$(
+            cat <<'EOF'
+echo '
+ALL_config="/etc/mkinitcpio.conf"
+ALL_kver="/boot/vmlinuz-linux"
+ALL_microcode=(/boot/*-ucode.img)
+
+PRESETS="default"
+
+default_image="/boot/initramfs-linux.img"
+' > /etc/mkinitcpio.d/${NAME%%-*}.preset
+
+mkinitcpio -p ${NAME%%-*}
+EOF
+        )
         # Set R/W permissions
         btrfs_subvolume_set_rw ${SUBVOL}
         frzr_chroot $SUBVOL $COMMAND
@@ -56,7 +70,21 @@ while $RUNNING; do
 
         ### Rebuild Initramfs with custom preset
         cd ${SUBVOL}
-        COMMAND="" #TODO Set this command value
+        COMMAND=$(
+            cat <<'EOF'
+echo '
+ALL_config="/etc/mkinitcpio.conf"
+ALL_kver="/boot/vmlinuz-linux"
+ALL_microcode=(/boot/*-ucode.img)
+
+PRESETS="default"
+
+default_image="/boot/initramfs-linux.img"
+' > /etc/mkinitcpio.d/\${NAME%%-*}.preset
+
+mkinitcpio -p \${NAME%%-*}
+EOF
+        )
         # Set R/W permissions
         btrfs_subvolume_set_rw ${SUBVOL}
         frzr_chroot $SUBVOL $COMMAND
@@ -108,16 +136,15 @@ default_image="/boot/'$BUILD'/initramfs-linux.img"
         STATE="SUCCESS"
         ;;
     "SUCCESS")
-    	echo "The initramfs rebuild was successful"
+        echo "The initramfs rebuild was successful"
         RUNNING=false
         ;;
     "FAIL")
-    	echo "There were errors while attempting to rebuild the initramfs"
+        echo "There were errors while attempting to rebuild the initramfs"
         RUNNING=false
         ;;
     *)
         echo "Something went terribly wrong"
-        echo $STATE
         RUNNING=false
         ;;
     esac
