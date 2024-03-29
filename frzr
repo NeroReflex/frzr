@@ -108,7 +108,7 @@ btrfs_subvolume_set_rw() {
             echo "OK"
         fi
     else
-        echo "EROR: the given argument '$dir' is not a btrfs subvolume"
+        echo "ERROR: the given argument '$dir' is not a btrfs subvolume"
     fi
 }
 
@@ -226,16 +226,16 @@ arg2=$3
 
 if [ $function == "help" ]; then
     echo "[Usage]
-frzr upgrade [Check for system updates and update the system if available]
+frzr deploy [Check for system updates and update the system if available]
 frzr set-channel [Set the update channel stable/testing/unstable]
-frzr version [Get the current version of the deployed OS]
+frzr get-channel [Get the update channel currently in use]
+frzr version [Get the version of FRZR]
 frzr build-initramfs [Build the initramfs for the kernel]
 frzr configure-tweaks [Configure system specific quirks]
 frzr bootstrap [Format and configure a drive to be used with FRZR]"
 elif [ $function == "bootstrap" ]; then
-    echo "bootstrap"
-    #source frzr-bootstrap $arg1 # frzr-bootstrap
-elif [ $function == "upgrade" ]; then
+    source frzr-bootstrap $arg1
+elif [ $function == "deploy" ]; then
     # Check if the lock file exists
     if [ -f /tmp/frzr.lock ]; then
         echo "$(basename $0) is already running"
@@ -255,19 +255,21 @@ elif [ $function == "upgrade" ]; then
     exit $RESULT
 elif [ $function == "version" ]; then
     echo "frzr-release"
+    #TODO Update frzr-release logic
+    #This probably should get the frzr version instead of the OS
     #source frzr-release
 elif [ $function == "set-channel" ]; then
     echo "set channel"
-    #source frzr-channel $arg1
+    #TODO create frzr-channel to set target channel
+    #frzr-channel $arg1
 elif [ $function == "get-channel" ]; then
     echo "get-channel"
+    #TODO create frzr-channel to get target channel
     #echo ${FRZR_ROOT}/source
 elif [ $function == "build-initramfs" ]; then
-    echo "frzr-initramfs"
-    #source frzr-initramfs
+    source frzr-initramfs
 elif [ $function == "configure-tweaks" ]; then
-    echo "frzr-tweaks"
-    #source frzr-tweaks
+    source frzr-tweaks
 else
     echo "invalid argument"
 fi
