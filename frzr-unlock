@@ -2,42 +2,50 @@
 
 set -e
 
+# import methods
+source "${BASH_SOURCE%/*}/__frzr" "$@"
 
 if [ $EUID -ne 0 ]; then
 	echo "$(basename $0) must be run as root"
 	exit 1
 fi
 
-if ! frzr-release > /dev/null; then
-	echo "Not currently running a frzr deployment"
-	exit 1
-fi
+MOUNT_PATH=/tmp/frzr_root
 
-MOUNT_PATH=/frzr_root
+# it's not necessay to write anything to the main subvolume
+#if ! mountpoint -q ${MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
+#	mkdir -p ${MOUNT_PATH}
+#	mount -L frzr_root ${MOUNT_PATH}
+#	sleep 5
+#fi
 
-if ! mountpoint -q ${MOUNT_PATH}; then
-        mkdir -p ${MOUNT_PATH}
-        mount -L frzr_root ${MOUNT_PATH}
-        sleep 5
-fi
-
-if ! mountpoint -q ${MOUNT_PATH}/boot && ls -1 /dev/disk/by-label | grep frzr_efi > /dev/null; then
-        mkdir -p ${MOUNT_PATH}/boot
-        mount -L frzr_efi ${MOUNT_PATH}/boot
-        sleep 5
-fi
+# it's not necessary to write anything to /efi
+#if ! mountpoint -q ${MOUNT_PATH}/boot && ls -1 /dev/disk/by-label | grep frzr_efi > /dev/null; then
+#	mkdir -p ${MOUNT_PATH}/boot
+#	mount -L frzr_efi ${MOUNT_PATH}/boot
+#	sleep 5
+#fi
 
 DEPLOYMENT=$(frzr-release)
+if echo "${set_subvol_rw}" | grep -q 'ERROR'; then
+	echo "frzr-unlock failed: not currently running a from frzr deployment"
+	exit 1
+else
+	# set rootfs btrfs subvolume to read-write mode
+	UNLOCK_RESULT=$(btrfs_subvolume_set_rw "/")
+	if echo "${set_subvol_rw}" | grep -q 'OK'; then
+		systemctl daemon-reload
 
-# set rootfs btrfs subvolume to read-write mode
-btrfs property set -fts / ro false
-systemctl daemon-reload
+		# copy package database and refresh
+		if [ -d /usr/var/lib/pacman/local ] && [ ! -d /var/lib/pacman/local ]; then
+			mkdir -p /var/lib/pacman
+			cp -r /usr/var/lib/pacman/local /var/lib/pacman/
+			pacman -Sy
+		fi
 
-# copy package database and refresh
-if [ -d /usr/var/lib/pacman/local ] && [ ! -d /var/lib/pacman/local ]; then
-	mkdir -p /var/lib/pacman
-	cp -r /usr/var/lib/pacman/local /var/lib/pacman/
-	pacman -Sy
-fi
-
-echo "frzr deployment ${DEPLOYMENT} unlocked"
+		echo "frzr deployment ${DEPLOYMENT} unlocked"
+	else
+		echo "frzr deployment ${DEPLOYMENT} unlock failed: cannot set subvolume to r/w"
+		exit 1
+	fi
+else
