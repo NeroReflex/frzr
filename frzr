@@ -60,7 +60,9 @@ frzr_chroot() {
     mount -t sysfs /sys sys/
     mount --rbind /dev dev/
 
-    chroot ${CHROOT_PATH} /bin/bash -c $CHROOT_CMD
+    chroot ${CHROOT_PATH} /bin/bash <<EOF
+    ${CHROOT_CMD}
+EOF
 }
 
 frzr_undo_chroot() {

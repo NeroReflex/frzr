@@ -30,29 +30,27 @@ while $RUNNING; do
         # We are doing a fresh new install
         echo "We are doing an rebuild within an installer"
         cd ${SUBVOL}
-        COMMAND=$(
-            cat <<'EOF'
-echo '
-ALL_config="/etc/mkinitcpio.conf"
-ALL_kver="/boot/vmlinuz-linux"
+        COMMAND='
+echo "
+ALL_config=\"/etc/mkinitcpio.conf\"
+ALL_kver=\"/boot/vmlinuz-linux\"
 ALL_microcode=(/boot/*-ucode.img)
 
-PRESETS="default"
+PRESETS=\"default\"
 
-default_image="/boot/initramfs-linux.img"
-' > /etc/mkinitcpio.d/${NAME%%-*}.preset
+default_image=\"/boot/initramfs-linux.img\"
+" > /etc/mkinitcpio.d/${NAME%%-*}.preset
 
 mkinitcpio -p ${NAME%%-*}
-EOF
-        )
+'
         # Set R/W permissions
         btrfs_subvolume_set_rw ${SUBVOL}
         echo "Entering chroot at ${SUBVOL}"
-        frzr_chroot $SUBVOL $COMMAND
+        frzr_chroot "$SUBVOL" "$COMMAND"
         # Set back to R/O permissions
         btrfs_subvolume_set_ro ${SUBVOL}
         echo "Exiting chroot at ${SUBVOL}"
-        frzr_undo_chroot ${SUBVOL}
+        frzr_undo_chroot "${SUBVOL}"
         STATE="SUCCESS"
         ;;
     "UPGRADE")
@@ -80,29 +78,27 @@ EOF
 
         ### Rebuild Initramfs with custom preset
         cd ${SUBVOL}
-        COMMAND=$(
-            cat <<'EOF'
-echo '
-ALL_config="/etc/mkinitcpio.conf"
-ALL_kver="/boot/vmlinuz-linux"
+        COMMAND='
+echo "
+ALL_config=\"/etc/mkinitcpio.conf\"
+ALL_kver=\"/boot/vmlinuz-linux\"
 ALL_microcode=(/boot/*-ucode.img)
 
-PRESETS="default"
+PRESETS=\"default\"
 
-default_image="/boot/initramfs-linux.img"
-' > /etc/mkinitcpio.d/\${NAME%%-*}.preset
+default_image=\"/boot/initramfs-linux.img\"
+" > /etc/mkinitcpio.d/${NAME%%-*}.preset
 
-mkinitcpio -p \${NAME%%-*}
-EOF
-        )
+mkinitcpio -p ${NAME%%-*}
+'
         # Set R/W permissions
         btrfs_subvolume_set_rw ${SUBVOL}
         echo "Entering chroot at ${SUBVOL}"
-        frzr_chroot $SUBVOL $COMMAND
+        frzr_chroot "$SUBVOL" "$COMMAND"
         # Set back to R/O permissions
         btrfs_subvolume_set_ro ${SUBVOL}
         echo "Exiting chroot at ${SUBVOL}"
-        frzr_undo_chroot ${SUBVOL}
+        frzr_undo_chroot "${SUBVOL}"
 
         STATE="CLEANUP"
         ;;
