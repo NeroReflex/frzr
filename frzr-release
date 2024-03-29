@@ -3,7 +3,7 @@
 set -e
 
 if [ ! -e /build_info ]; then
-	echo "Not currently running a frzr deployment"
+	echo "ERROR: not currently running a frzr deployment"
 	exit 1
 fi
 
