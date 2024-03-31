@@ -27,17 +27,25 @@ MOUNT_PATH=/tmp/frzr_root
 #fi
 
 DEPLOYMENT=$(frzr-release)
-if echo "${set_subvol_rw}" | grep -q 'ERROR'; then
+if echo "${DEPLOYMENT}" | grep -Fq 'ERROR'; then
 	echo "frzr-unlock failed: not currently running a from frzr deployment"
 	exit 1
 else
 	# set rootfs btrfs subvolume to read-write mode
 	UNLOCK_RESULT=$(btrfs_subvolume_set_rw "/")
-	if echo "${set_subvol_rw}" | grep -q 'OK'; then
+	if echo "${UNLOCK_RESULT}" | grep -q 'OK'; then
 		systemctl daemon-reload
 
-		# copy package database and refresh
-		if [ -d /usr/var/lib/pacman/local ] && [ ! -d /var/lib/pacman/local ]; then
+		if is_btrfs_subvolume "${SUBVOL}/var/lib/pacman/"; then
+			# just unlock the pacman database subvolume
+			local unlock_res=$(btrfs_subvolume_set_rw "${SUBVOL}/var/lib/pacman/")
+
+			if echo "${unlock_res}" | grep -Fqx "OK"; then
+				echo "frzr deployment ${DEPLOYMENT} unlock failed: cannot set pacman database to r/w"
+				exit 1
+			fi
+		elif [ -d /usr/var/lib/pacman/local ] && [ ! -d /var/lib/pacman/local ]; then
+			# copy package database and refresh
 			mkdir -p /var/lib/pacman
 			cp -r /usr/var/lib/pacman/local /var/lib/pacman/
 			pacman -Sy

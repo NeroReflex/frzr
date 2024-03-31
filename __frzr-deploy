@@ -267,26 +267,61 @@ main() {
 				fi
 
 				# manage /etc as a subvolume
-				if [ -f "${SUBVOL}/usr/etc" ]; then
-					btrfs snapshot create "${SUBVOL}/etc"
+				if [ -d "${SUBVOL}/usr/etc" ]; then
+					btrfs subvolume create "${SUBVOL}/etc"
 					cp -a ${SUBVOL}/usr/etc/* "${SUBVOL}/etc/"
-				
-				
 
-					# Execute and migrations available in the image to be deployed
-					execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
-
-					# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
-					if [ -f "${MOUNT_PATH}/root_uuid" ]; then
-						local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
-						sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
-					else
-						local disk=$(blkid -L frzr_root)
-						local root_uuid=$(blkid -s UUID -o value "${disk}p2")
-						sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
+					if [ -d "${SUBVOL}/var" ]; then
+						mv "${SUBVOL}/var" "${SUBVOL}/usr/var" 
 					fi
 
-					STATE="VERIFY"
+					if [ -d "${SUBVOL}/usr/var" ]; then
+						btrfs subvolume create "${SUBVOL}/var"
+						cp -a ${SUBVOL}/usr/var/* "${SUBVOL}/var/"
+
+						# if /var is empty borrow from frzr_root var
+
+						mkdir -p "${SUBVOL}/var/lib/"
+						btrfs subvolume create "${SUBVOL}/var/lib/pacman"
+
+						if [ -d "${SUBVOL}/usr/var/lib/pacman/" ]; then
+							btrfs subvolume create "${SUBVOL}/var"
+							cp -a ${SUBVOL}/usr/var/lib/pacman/* "${SUBVOL}/var/lib/pacman/"
+
+							# TODO: set that subvolume back to RO
+						else
+							TASK_ERROR=1
+							TASK_ERROR_MSG="No /usr/var/lib/pacman directory found in the deployed image"
+							STATE="FAIL"
+						fi
+
+						if [ ! -d "${SUBVOL}/efi" ]; then
+							mkdir "${SUBVOL}/efi"
+						fi
+
+						mount --bind "${efi_root_path}" "${SUBVOL}/efi"
+
+						# Execute and migrations available in the image to be deployed
+						execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
+
+						# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
+						if [ -f "${MOUNT_PATH}/root_uuid" ]; then
+							local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
+							sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
+						elif [ ! -z $FRZR_ROOT_UUID ]; then
+							# TODO: use this
+						else
+							# TODO: warn about UUID not being set
+						fi
+
+						# TODO: if MOUNT_POINT/home is a subvolume add that to fstab if /home is not there already
+
+						STATE="VERIFY"
+					else
+						TASK_ERROR=1
+						TASK_ERROR_MSG="No /var directory found in the deployed image"
+						STATE="FAIL"
+					fi
 				else
 					TASK_ERROR=1
 					TASK_ERROR_MSG="No /etc directory found in the deployed image"
