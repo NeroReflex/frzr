@@ -288,7 +288,14 @@ main() {
 							btrfs subvolume create "${SUBVOL}/var"
 							cp -a ${SUBVOL}/usr/var/lib/pacman/* "${SUBVOL}/var/lib/pacman/"
 
-							# TODO: set that subvolume back to RO
+							# set that subvolume back to RO
+							local $pacman_subvol_set_ro_res=$(btrfs_subvolume_set_ro "${SUBVOL}/usr/var/lib/pacman")
+							if echo "${pacman_subvol_set_ro_res}" | grep -Fqx "ERROR"; then
+								TASK_ERROR=1
+								TASK_ERROR_MSG="Cannot set /usr/var/lib/pacman subvolume as read-only"
+								STATE="FAIL"
+								continue
+							fi
 						else
 							TASK_ERROR=1
 							TASK_ERROR_MSG="No /usr/var/lib/pacman directory found in the deployed image"
@@ -301,20 +308,24 @@ main() {
 
 						mount --bind "${efi_root_path}" "${SUBVOL}/efi"
 
-						# Execute and migrations available in the image to be deployed
-						execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
-
 						# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
 						if [ -f "${MOUNT_PATH}/root_uuid" ]; then
 							local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
 							sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
 						elif [ ! -z $FRZR_ROOT_UUID ]; then
-							# TODO: use this
+							sed -i -e "s/LABEL=frzr_root/UUID=${FRZR_ROOT_UUID}/" "${SUBVOL}/etc/fstab"
 						else
 							# TODO: warn about UUID not being set
 						fi
 
 						# TODO: if MOUNT_POINT/home is a subvolume add that to fstab if /home is not there already
+						echo "" > "${SUBVOL}/etc/fstab"
+						if is_btrfs_subvolume "$dir"; then
+							
+						fi
+
+						# Execute and migrations available in the image to be deployed
+						execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
 
 						STATE="VERIFY"
 					else
@@ -333,7 +344,7 @@ main() {
 			TASK_STATE="VERIFY"
 
 			# verify the subvolume integrity
-			if btrfs scrub start -Bdr "$SUBVOL"; then
+			if btrfs scrub start -Bdr "${SUBVOL}"; then
 				# Verify the system installation status, check for device quirks, and prepare for cleanup
 				# Check if the FIRMWARE_OVERRIDE variable is set by the install media, if so enable firmware overrides
 				if [ -n "${FIRMWARE_OVERRIDE}" ]; then
