@@ -320,8 +320,27 @@ main() {
 
 						# TODO: if MOUNT_POINT/home is a subvolume add that to fstab if /home is not there already
 						echo "" > "${SUBVOL}/etc/fstab"
-						if is_btrfs_subvolume "$dir"; then
-							
+						if is_btrfs_subvolume "${MOUNT_PATH}/home"; then
+							local home_subvolid=$(btrfs_subvol_get_id "${MOUNT_PATH}/home")
+							if echo "${home_subvolid}" | grep -Fqx "ERROR"; then
+								TASK_ERROR=1
+								TASK_ERROR_MSG="Cannot get the subvolume ID for ${MOUNT_PATH}/home subvolume"
+								STATE="FAIL"
+								continue
+							else
+								if [ -f "${MOUNT_PATH}/root_uuid" ]; then
+									local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
+									echo "UUID=${root_uuid} btrfs rw,subvolid=${home_subvolid},noatime 0 0" >> "${SUBVOL}/etc/fstab"
+								elif [ ! -z $FRZR_ROOT_UUID ]; then
+									echo "UUID=${FRZR_ROOT_UUID} btrfs rw,subvolid=${home_subvolid},noatime 0 0" >> "${SUBVOL}/etc/fstab"
+								else
+									echo "LABEL=frzr_root btrfs rw,subvolid=${home_subvolid},noatime 0 0"
+								fi
+							fi
+						fi
+
+						if [ ! -z $FRZR_ROOT_UUID ]; then
+							echo "FRZR_ROOT_UUID=\"${FRZR_ROOT_UUID}\"" >> /etc/environment
 						fi
 
 						# Execute and migrations available in the image to be deployed

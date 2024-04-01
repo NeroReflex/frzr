@@ -143,6 +143,9 @@ fresh_install() {
 		btrfs subvolume create ${frzr_root}/home
 	fi
 
+	# set the /home as no copy-on-write
+	chattr +C "${frzr_root}/home"
+
 	# create folder for the gamer user
 	mkdir -p ${frzr_root}/home/${USERNAME}
 	chown 1000:1000 ${frzr_root}/home/${USERNAME}		
