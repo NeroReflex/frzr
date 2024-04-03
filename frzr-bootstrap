@@ -111,6 +111,8 @@ fresh_install() {
 	mkdir -p ${frzr_root}/efi # prepare to mount vfat
 	echo "${root_uuid}" >${frzr_root}/root_uuid
 	btrfs subvolume create ${frzr_root}/var
+	btrfs subvolume create ${frzr_root}/etc
+	btrfs subvolume create ${frzr_root}/.etc
 
 	# setup boot partition & install bootloader
 	local efi_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
