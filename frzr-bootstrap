@@ -43,10 +43,10 @@ fresh_install() {
 
 	# TODO: the user can set 0 size: handle accordingly. whatever partition gets skipped ends up in the root
 
-	if $SWAP_GIB == 0; then
+	if [[ $SWAP_GIB -eq 0 ]]; then
 		SWAP_PART_NUMBER=0
 		ROOT_PART_NUMBER=2
-		if $ROOT_GIB == 0; then
+		if [[ $ROOT_GIB -eq 0]]; then
 			HOME_PART_NUMBER=0
 		else
 			HOME_PART_NUMBER=3
@@ -54,7 +54,7 @@ fresh_install() {
 	else
 		SWAP_PART_NUMBER=2
 		ROOT_PART_NUMBER=3
-		if $ROOT_GIB == 0; then
+		if [[ $ROOT_GIB -eq 0 ]]; then
 			HOME_PART_NUMBER=0
 		else
 			HOME_PART_NUMBER=4
@@ -62,12 +62,12 @@ fresh_install() {
 	fi
 
 	declare -i SWAP_START=1
-	declare -i SWAP_END=${SWAP_GIB}+${SWAP_START}
+	declare -i SWAP_END=$((SWAP_GIB + SWAP_START))
 
-	declare -i ROOT_START=${SWAP_END}
-	declare -i ROOT_END=${ROOT_START}+${ROOT_GIB}
+	declare -i ROOT_START=$((SWAP_END))
+	declare -i ROOT_END=$((ROOT_START + ROOT_GIB))
 
-	declare -i HOME_START=${ROOT_END}
+	declare -i HOME_START=$((ROOT_END))
 
 	# create the GPT partition table and set the correct GPT type for each partition
 	parted --script ${disk} \
@@ -109,32 +109,31 @@ fresh_install() {
 	dosfslabel ${efi_part} frzr_efi
 	mount -t vfat ${efi_part} ${frzr_root}/efi/
 	bootctl --esp-path=${frzr_root}/efi/ install
-	
-	# setup the swap partition
-	if $SWAP_PART_NUMBER != 0; then
-		local swap_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${SWAP_PART_NUMBER}$")
-		mkswap ${swap_part}
-		local swap_uuid=$(blkid -s UUID -o value "${swap_part}")
-		echo "${swap_uuid}" >${frzr_root}/swap_uuid
-	fi	
 
 	# this creates the subvolid 5
 	local root_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${ROOT_PART_NUMBER}$")
 	mkfs.btrfs -L frzr_root -f ${root_part}
 	local root_uuid=$(blkid -s UUID -o value "${root_part}")
+	mount ${root_part} ${frzr_root} # mount rootfs
+	mkdir -p ${frzr_root}/efi # prepare to mount vfat
 	echo "${root_uuid}" >${frzr_root}/root_uuid
 
-	# mount the rootfs so that the install can be performed
-	mount ${root_part} ${frzr_root}
-	mkdir ${frzr_root}/efi
+	# setup the swap partition
+	if [[ $SWAP_PART_NUMBER -ne 0 ]]; then
+		local swap_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${SWAP_PART_NUMBER}$")
+		mkswap ${swap_part}
+		local swap_uuid=$(blkid -s UUID -o value "${swap_part}")
+		echo "${swap_uuid}" >${frzr_root}/swap_uuid
+		swapon ${swap_part} # activate swap for the installer
+	fi	
 
 	# TODO: if a minimal/recovery system has to installed in the main partition here is the place to do just that.
 
 	# setup home partition
-	if $HOME_PART_NUMBER != 0; then
-		mkdir ${frzr_root}/home
+	if [[ $HOME_PART_NUMBER -ne 0 ]]; then
 		local home_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${HOME_PART_NUMBER}$")
 		mkfs.btrfs -L frzr_home -f ${home_part}
+		mkdir -p ${frzr_root}/home
 		mount -t btrfs -o nodatacow ${home_part} ${frzr_root}/home
 		local home_uuid=$(blkid -s UUID -o value "${home_part}")
 		echo "${home_uuid}" >${frzr_root}/home_uuid
