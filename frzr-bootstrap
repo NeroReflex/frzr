@@ -111,8 +111,8 @@ fresh_install() {
 	mkdir -p ${frzr_root}/efi # prepare to mount vfat
 	echo "${root_uuid}" >${frzr_root}/root_uuid
 	btrfs subvolume create ${frzr_root}/var
-	btrfs subvolume create ${frzr_root}/etc
-	btrfs subvolume create ${frzr_root}/.etc
+	mkdir -p ${frzr_root}/etc
+	mkdir -p ${frzr_root}/.etc
 
 	# setup boot partition & install bootloader
 	local efi_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
@@ -129,8 +129,6 @@ fresh_install() {
 		echo "${swap_uuid}" >${frzr_root}/swap_uuid
 		swapon ${swap_part} # activate swap for the installer
 	fi	
-
-	# TODO: if a minimal/recovery system has to installed in the main partition here is the place to do just that.
 
 	# setup home partition
 	if [[ $HOME_PART_NUMBER -ne 0 ]]; then
@@ -150,7 +148,10 @@ fresh_install() {
 
 	# create folder for the gamer user
 	mkdir -p ${frzr_root}/home/${USERNAME}
-	chown 1000:1000 ${frzr_root}/home/${USERNAME}		
+	chown 1000:1000 ${frzr_root}/home/${USERNAME}
+
+	# TODO: if a minimal/recovery system has to installed in the main partition here is the place to do just that.
+
 }
 
 if [ $EUID -ne 0 ]; then
