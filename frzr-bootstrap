@@ -79,13 +79,13 @@ fresh_install() {
 		type 1 "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" \
 		set 1 esp on
 	
-	if $SWAP_PART_NUMBER != 0; then
+	if [[ $SWAP_PART_NUMBER -ne 0 ]]; then
 		parted --script ${disk} \
 			mkpart primary linux-swap ${SWAP_START}GiB ${SWAP_END}GiB \
 			type $SWAP_PART_NUMBER "0657fd6d-a4ab-43c4-84e5-0933c84b4f4f"
 	fi
 
-	if $HOME_PART_NUMBER != 0; then
+	if [[ $HOME_PART_NUMBER -ne 0 ]]; then
 		# split / and /home in to partitions
 
 		parted --script ${disk} \
@@ -103,13 +103,6 @@ fresh_install() {
 			type $ROOT_PART_NUMBER "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709"
 	fi
 
-	# setup boot partition & install bootloader
-	local efi_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
-	mkfs.vfat ${efi_part}
-	dosfslabel ${efi_part} frzr_efi
-	mount -t vfat ${efi_part} ${frzr_root}/efi/
-	bootctl --esp-path=${frzr_root}/efi/ install
-
 	# this creates the subvolid 5
 	local root_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${ROOT_PART_NUMBER}$")
 	mkfs.btrfs -L frzr_root -f ${root_part}
@@ -117,6 +110,13 @@ fresh_install() {
 	mount ${root_part} ${frzr_root} # mount rootfs
 	mkdir -p ${frzr_root}/efi # prepare to mount vfat
 	echo "${root_uuid}" >${frzr_root}/root_uuid
+
+	# setup boot partition & install bootloader
+	local efi_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
+	mkfs.vfat ${efi_part}
+	dosfslabel ${efi_part} frzr_efi
+	mount -t vfat ${efi_part} ${frzr_root}/efi/
+	bootctl --esp-path=${frzr_root}/efi/ install
 
 	# setup the swap partition
 	if [[ $SWAP_PART_NUMBER -ne 0 ]]; then
