@@ -46,7 +46,7 @@ fresh_install() {
 	if [[ $SWAP_GIB -eq 0 ]]; then
 		SWAP_PART_NUMBER=0
 		ROOT_PART_NUMBER=2
-		if [[ $ROOT_GIB -eq 0]]; then
+		if [[ $ROOT_GIB -eq 0 ]]; then
 			HOME_PART_NUMBER=0
 		else
 			HOME_PART_NUMBER=3
