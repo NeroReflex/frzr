@@ -185,6 +185,7 @@ while $RUNNING; do
 
 			if (whiptail --yesno --yes-button "Repair" --no-button "Clean" "WARNING: $DISK appears to already have a system installed. Would you like to repair it or do a clean install?\n\nNOTE: A clean install will delete everything on the disk, but a repair install will preserve your user data." 13 70); then
 				echo "User chose to do a repair install"
+				REPAIR_INSTALL=1
 				STATE="REPAIR"
 			else
 				echo "User chose to do a clean install"
@@ -210,6 +211,7 @@ while $RUNNING; do
 			STATE="SUCCESS"
 		else
 			STATE="Fail"
+			continue
 		fi
 		;;
 	"REPAIR")
@@ -220,6 +222,7 @@ while $RUNNING; do
 			STATE="SUCCESS"
 		else
 			STATE="Fail"
+			continue
 		fi
 		;;
 	"SUCCESS")
