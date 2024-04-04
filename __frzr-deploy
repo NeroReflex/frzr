@@ -194,10 +194,21 @@ main() {
 				IMG_FILE="${MOUNT_PATH}/${FILE_NAME}"
 
 				if [ -e ${SUBVOL} ]; then
-					TASK_ERROR=1
-					TASK_ERROR_MSG="Cannot deploy image ${NAME}: already installed"
-					STATE="FAIL"
-					continue
+
+					# Only allow deleting the subvolume if we are booted in the installer.
+					if [ "$UPGRADE" -eq 0 ]; then
+						MSG="${NAME} is already installed, would you like to delete this and re-deploy?"
+						if (whiptail --yesno "${MSG}" 10 50); then
+							echo "deleting ${NAME}..."
+							btrfs subvolume delete ${SUBVOL}
+							rm -rf "${EFI_MOUNT_PATH}/${NAME}"
+						fi
+					else
+						TASK_ERROR=1
+						TASK_ERROR_MSG="${NAME} is already installed"
+						STATE="FAIL"
+						continue
+					fi
 				fi
 
 				if [ $FRZR_CHECK_UPDATE -eq 1 ]; then
