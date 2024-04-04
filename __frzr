@@ -264,20 +264,16 @@ generate_systemd_boot_cfg() {
 
 			# write /chimeraos-46_fcc653a3/amd-ucode.img if necessary
 			if [ -f ${mount_path}/${version}/${amd_ucode} ]; then
-				write_log "$FUNCNAME: The AMD ucode has been found at '$mount_path/$version/$amd_ucode' -- amd-ucode included in boot configuration"
 				echo "initrd /${version}/${amd_ucode}" | tee --append ${entry_conf} >/dev/null
 			else
 				echo "# amd-ucode.img omitted" | tee --append ${entry_conf} >/dev/null
-				write_log "$FUNCNAME: The AMD ucode has NOT been found at '$mount_path/$version/$amd_ucode' -- amd-ucode initrd omitted from boot configuration"
 			fi
 
 			# write /chimeraos-46_fcc653a3/intel-ucode.img if necessary
 			if [ -f ${mount_path}/${version}/${intel_ucode} ]; then
-				write_log "$FUNCNAME: Intel ucode has been found at '$mount_path/$version/$intel_ucode' -- intel-ucode included in boot configuration"
 				echo "initrd /${version}/${intel_ucode}" | tee --append ${entry_conf} >/dev/null
 			else
 				echo "# intel-ucode.img omitted" | tee --append ${entry_conf} >/dev/null
-				write_log "$FUNCNAME: Intel ucode has NOT been found at '$mount_path/$version/$intel_ucode' -- intel-ucode initrd omitted from boot configuration" | tee --append ${entry_conf} >/dev/null
 			fi
 
 			# write /chimeraos-46_fcc653a3/initrams-linuz.img
@@ -289,14 +285,10 @@ generate_systemd_boot_cfg() {
 			# return success
 			echo "OK"
 		else
-			write_log "$FUNCNAME: initramfs has NOT been found at '$mount_path/$version/$initramfs'" 1
-
 			# return the error to be printed out
 			echo "ERROR: initramfs not found (searched at: '$mount_path/$version/$initramfs')"
 		fi
 	else
-		write_log "$FUNCNAME: vmlinuz (linux kernel) has been found at '$mount_path/$version/$vmlinuz'" 1
-
 		# return the error to be printed out
 		echo "ERROR: kernel not found (searched at: '$mount_path/$version/$vmlinuz')"
 	fi
@@ -343,7 +335,6 @@ check_uefi() {
 	if [ -d /sys/firmware/efi/efivars ]; then
 		echo "OK"
 	else
-		write_log "$FUNCNAME: Legacy BIOS installs are not supported" 1
 		echo "ERROR: Not a UEFI system"
 	fi
 }
@@ -427,11 +418,9 @@ prepare_efi_partition() {
 					local additional_arguments=""
 					if [ -f ${deployment_root}/usr/lib/frzr.d/bootconfig.conf ]; then
 						additional_arguments="$additional_arguments $(cat ${deployment_root}/usr/lib/frzr.d/bootconfig.conf)"
-					else
-						write_log "$FUNCNAME: File '${deployment_root}/usr/lib/frzr.d/bootconfig.conf' has not been found. No additional boot arguments will be set." 2
 					fi
 
-					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "ucode"; then
+					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "microcode"; then
 						echo "ucode hook has been found"
 					else
 						local amd_ucode="amd-ucode.img"
@@ -440,8 +429,8 @@ prepare_efi_partition() {
 						fi
 					fi
 
-					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "ucode"; then
-						echo "ucode hook has boon found"
+					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "microcode"; then
+						echo "ucode hook has been found"
 					else
 						local intel_ucode="intel-ucode.img"
 						if [ -e ${deployment_root}/boot/intel-ucode.img ]; then
