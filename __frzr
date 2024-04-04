@@ -382,7 +382,7 @@ execute_migrations() {
 # return "OK" for success, and error string otherwise"
 prepare_efi_partition() {
 	local version=${1}
-	local mount_path=${2}
+	local efi_root_path=${2}
 	local deployment_root=${3}
 	local amd_ucode=${4}
 	local intel_ucode=${5}
@@ -442,11 +442,11 @@ prepare_efi_partition() {
 					cp ${deployment_root}/boot/${vmlinuz_name} ${efi_root_path}/${version}/${vmlinuz_name}
 					cp ${deployment_root}/boot/${initramfs_name} ${efi_root_path}/${version}/${initramfs_name}
 
-					local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${mount_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${boot_entry}")
+					local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${efi_root_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${boot_entry}")
 					echo "systemd-boot install: ${systemd_boot_update_result}"
 
 					if echo "${systemd_boot_update_result}" | grep -q 'OK'; then
-						echo "default ${boot_entry}" >${mount_path}/loader/loader.conf
+						echo "default ${boot_entry}" >${efi_root_path}/loader/loader.conf
 
 						echo "OK"
 					else
