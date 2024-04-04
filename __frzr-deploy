@@ -25,28 +25,27 @@ main() {
 
 	local RUNNING=true
 	local STATE="CHECK"
-	echo "Entering Running loop"
 	while $RUNNING; do
 		case "$STATE" in
 		"CHECK")
-			echo "Entering Check case"
 			TASK_STATE="CHECK"
 			TASK_MSG="Checking for root privileges"
 			if [ $EUID -ne 0 ]; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="$(basename $0) not run as root"
 				STATE="FAIL"
-			else
-				TASK_MSG="Checking is system has booted via UEFI"
-				check_uefi_result=$(check_uefi)
-				if ! echo "${check_uefi_result}" | grep -q 'OK'; then
-					TASK_ERROR=1
-					TASK_ERROR_MSG="${check_uefi_result}"
-					STATE="FAIL"
-				else
-					TASK_MSG="We are booted using UEFI"
-				fi
+				continue
 			fi
+
+			TASK_MSG="Checking is system has booted via UEFI"
+			check_uefi_result=$(check_uefi)
+			if echo "${check_uefi_result}" | grep -Fqx 'ERROR'; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="UEFI boot check failed: ${check_uefi_result}"
+				STATE="FAIL"
+				continue
+			fi
+			
 			# Check if any updates are available and preserve FRZR parameters
 			while (("$#")); do
 				case $1 in
@@ -69,7 +68,7 @@ main() {
 					;;
 				esac
 			done
-			echo "Entering Begin Case"
+
 			STATE="BEGIN"
 			;;
 		"BEGIN")
@@ -95,28 +94,33 @@ main() {
 				DEPLOY_PATH=${MOUNT_PATH}/deployments
 				mkdir -p ${DEPLOY_PATH}
 
-				# TODO: check that DEPLOY_PATH exists, and if not terminate the whole procedure giving the user an error
+				# Make sure DEPLOY_PATH exists
+				if [ ! -d "${DEPLOY_PATH}" ]; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not bind ${EFI_MOUNT_PATH} to frzr_efi (boot) partition"
+					STATE="FAIL"
+					continue
+				fi
 
 				write_log "Using '${DEPLOY_PATH}' as the deployment destination path"
 
 				local deploy_systemd_boot_cfg="frzr.conf"
 
 				# Make sure the EFI partition is mounted during the deployment procedure
-				local efi_root_path="${MOUNT_PATH}/efi"
-				if ! mountpoint -q ${efi_root_path} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
-					mkdir -p ${efi_root_path}
-					mount -L frzr_efi ${efi_root_path}
+				EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
+				if ! mountpoint -q ${EFI_MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
+					mkdir -p ${EFI_MOUNT_PATH}
+					mount -L frzr_efi ${EFI_MOUNT_PATH}
 					sleep 5
 				fi
 
 				# Check the "EFI System" partition is actually mounted
-				if mountpoint -q ${efi_root_path} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
-					BOOT_CFG="${efi_root_path}/loader/entries/${deploy_systemd_boot_cfg}"
-					echo "Entering Download case"
+				if mountpoint -q ${EFI_MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
+					BOOT_CFG="${EFI_MOUNT_PATH}/loader/entries/${deploy_systemd_boot_cfg}"
 					STATE="DOWNLOAD"
 				else
 					TASK_ERROR=1
-					TASK_ERROR_MSG="Could not bind ${efi_root_path} to frzr_efi (boot) partition"
+					TASK_ERROR_MSG="Could not bind ${EFI_MOUNT_PATH} to frzr_efi (boot) partition"
 					STATE="FAIL"
 				fi
 			else
@@ -164,13 +168,17 @@ main() {
 				IMG_URL=$(curl --http1.1 -L -s "${RELEASES_URL}" | get_img_url "${CHANNEL}")
 
 				if [ -z "$IMG_URL" ] || [ "$IMG_URL" == "null" ]; then
-					echo "No matching source found"
 					if curl --http1.1 -L -s "${RELEASES_URL}" | grep "rate limit" >/dev/null; then
 						TASK_ERROR=1
 						TASK_ERROR_MSG="GitHub API rate limit exceeded"
 						STATE="FAIL"
+					else
+						TASK_ERROR=1
+						TASK_ERROR_MSG="No matching source found"
+						STATE="FAIL"
 					fi
-					STATE="FAIL"
+
+					continue
 				fi
 
 				FILE_NAME=$(basename ${IMG_URL})
@@ -182,8 +190,9 @@ main() {
 
 				if [ -e ${SUBVOL} ]; then
 					TASK_ERROR=1
-					TASK_ERROR_MSG="${NAME} already installed; aborting"
+					TASK_ERROR_MSG="Cannot deploy image ${NAME}: already installed"
 					STATE="FAIL"
+					continue
 				fi
 
 				if [ $FRZR_CHECK_UPDATE -eq 1 ]; then
@@ -211,10 +220,12 @@ main() {
 			CHECKSUM2=$(sha256sum "${IMG_FILE}" | cut -d' ' -f 1)
 			if [ "$CHECKSUM" != "$CHECKSUM2" ]; then
 				rm -f "${IMG_FILE}"
-				echo "checksum does not match; aborting"
+
 				# We can attempt to redownload the image again here instead of aborting like the original behavior
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Checksum does not match"
+				STATE="FAIL"
+				continue
 			fi
 			TASK_TRACKER=1 # Tell any listeners this task was completed, I'm not sure this variable will be needed in the end
 			echo "Entering Extract Case"
@@ -224,145 +235,72 @@ main() {
 			TASK_STATE="EXTRACT"
 			# Extract tar of system image
 			# This step might not ever need to be used, but left here depending on the occasion it may be needed.
-			echo "Entering Install Case"
 
 			# Write the deployment image to disk (if it was not being done already by the download step)
 			if is_btrfs_subvolume "$SUBVOL"; then
 				# skip this step: the subvolume has been created already
 				STATE="INSTALL"
-			else
-				# Use BTRFS receive to install the image
-				if [ -z ${SHOW_UI} ]; then
-					echo "installing ${NAME}..."
-				else
-					# TODO: verify if this really works
-					whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
-				fi
-
-				local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
-				if echo "${install_result}" | grep -q 'OK'; then
-					STATE="INSTALL"
-				else
-					TASK_ERROR=1
-					TASK_ERROR_MSG="Error extracting the deployment image"
-					STATE="FAIL"
-				fi
+				continue
 			fi
+
+			# Use BTRFS receive to install the image
+			if [ -z ${SHOW_UI} ]; then
+				echo "Installing ${NAME}..."
+			else
+				# TODO: verify if this really works
+				whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
+			fi
+
+			local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
+			if echo "${install_result}" | grep -q 'ERROR'; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Error extracting the deployment image: ${install_result}"
+				STATE="FAIL"
+			fi
+
+			STATE="INSTALL"
 			;;
 		"INSTALL")
 			TASK_STATE="INSTALL"
 			
-			echo "Entering Verify Case"
-
+			# TODO: use correct (unrenamed) files
 			local vmlinuz_name="vmlinuz-linux"
 			local initramfs_name="initramfs-linux.img"
 
 			# Migrations should be able to modify the new installed image: set ${SUBVOL} R/W
-			local set_subvol_rw=$(btrfs_subvolume_set_rw "${SUBVOL}")
-			echo "Deployment Set RW: ${set_subvol_rw}"
-			if echo "${set_subvol_rw}" | grep -q 'OK'; then
-				# if image comes with /etc move that to /usr/etc
-				if [ -d "${SUBVOL}/etc" ]; then
-					mv "${SUBVOL}/etc" "${SUBVOL}/usr/etc"
-				fi
+			#local set_subvol_rw=$(btrfs_subvolume_set_rw "${SUBVOL}")
+			#if echo "${set_subvol_rw}" | grep -Fqx 'ERROR'; then
+			#	TASK_ERROR=1
+			#	TASK_ERROR_MSG="Cannot set ${SUBVOL} R/W: ${set_subvol_rw}"
+			#	STATE="FAIL"
+			#	continue
+			#fi
 
-				# manage /etc as a subvolume
-				if [ -d "${SUBVOL}/usr/etc" ]; then
-					btrfs subvolume create "${SUBVOL}/etc"
-					cp -a ${SUBVOL}/usr/etc/* "${SUBVOL}/etc/"
-
-					if [ -d "${SUBVOL}/var" ]; then
-						mv "${SUBVOL}/var" "${SUBVOL}/usr/var" 
-					fi
-
-					if [ -d "${SUBVOL}/usr/var" ]; then
-						btrfs subvolume create "${SUBVOL}/var"
-						cp -a ${SUBVOL}/usr/var/* "${SUBVOL}/var/"
-
-						# if /var is empty borrow from frzr_root var
-
-						mkdir -p "${SUBVOL}/var/lib/"
-						btrfs subvolume create "${SUBVOL}/var/lib/pacman"
-
-						if [ -d "${SUBVOL}/usr/var/lib/pacman/" ]; then
-							btrfs subvolume create "${SUBVOL}/var"
-							cp -a ${SUBVOL}/usr/var/lib/pacman/* "${SUBVOL}/var/lib/pacman/"
-
-							# set that subvolume back to RO
-							local $pacman_subvol_set_ro_res=$(btrfs_subvolume_set_ro "${SUBVOL}/usr/var/lib/pacman")
-							if echo "${pacman_subvol_set_ro_res}" | grep -Fqx "ERROR"; then
-								TASK_ERROR=1
-								TASK_ERROR_MSG="Cannot set /usr/var/lib/pacman subvolume as read-only"
-								STATE="FAIL"
-								continue
-							fi
-						else
-							TASK_ERROR=1
-							TASK_ERROR_MSG="No /usr/var/lib/pacman directory found in the deployed image"
-							STATE="FAIL"
-						fi
-
-						if [ ! -d "${SUBVOL}/efi" ]; then
-							mkdir "${SUBVOL}/efi"
-						fi
-
-						mount --bind "${efi_root_path}" "${SUBVOL}/efi"
-
-						# convert /etc/fstab label= to UUID= to avoid cross-referencing another disk
-						if [ -f "${MOUNT_PATH}/root_uuid" ]; then
-							local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
-							sed -i -e "s/LABEL=frzr_root/UUID=${root_uuid}/" "${SUBVOL}/etc/fstab"
-						elif [ ! -z $FRZR_ROOT_UUID ]; then
-							sed -i -e "s/LABEL=frzr_root/UUID=${FRZR_ROOT_UUID}/" "${SUBVOL}/etc/fstab"
-						else
-							# TODO: warn about UUID not being set
-						fi
-
-						# TODO: if MOUNT_POINT/home is a subvolume add that to fstab if /home is not there already
-						echo "" > "${SUBVOL}/etc/fstab"
-						if is_btrfs_subvolume "${MOUNT_PATH}/home"; then
-							local home_subvolid=$(btrfs_subvol_get_id "${MOUNT_PATH}/home")
-							if echo "${home_subvolid}" | grep -Fqx "ERROR"; then
-								TASK_ERROR=1
-								TASK_ERROR_MSG="Cannot get the subvolume ID for ${MOUNT_PATH}/home subvolume"
-								STATE="FAIL"
-								continue
-							else
-								if [ -f "${MOUNT_PATH}/root_uuid" ]; then
-									local root_uuid=$(cat ${MOUNT_PATH}/root_uuid)
-									echo "UUID=${root_uuid} btrfs rw,subvolid=${home_subvolid},noatime 0 0" >> "${SUBVOL}/etc/fstab"
-								elif [ ! -z $FRZR_ROOT_UUID ]; then
-									echo "UUID=${FRZR_ROOT_UUID} btrfs rw,subvolid=${home_subvolid},noatime 0 0" >> "${SUBVOL}/etc/fstab"
-								else
-									echo "LABEL=frzr_root btrfs rw,subvolid=${home_subvolid},noatime 0 0"
-								fi
-							fi
-						fi
-
-						if [ ! -z $FRZR_ROOT_UUID ]; then
-							echo "FRZR_ROOT_UUID=\"${FRZR_ROOT_UUID}\"" >> /etc/environment
-						fi
-
-						# Execute and migrations available in the image to be deployed
-						execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
-
-						STATE="VERIFY"
-					else
-						TASK_ERROR=1
-						TASK_ERROR_MSG="No /var directory found in the deployed image"
-						STATE="FAIL"
-					fi
-				else
-					TASK_ERROR=1
-					TASK_ERROR_MSG="No /etc directory found in the deployed image"
-					STATE="FAIL"
-				fi
+			if [ -d "${SUBVOL}/efi" ]; then
+				mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL}/efi"
+			else
+				# TODO: warn about missing /efi
 			fi
+
+			# Execute and migrations available in the image to be deployed
+			execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
+
+			# set that subvolume back to RO
+			#local $pacman_subvol_set_ro_res=$(btrfs_subvolume_set_ro "${SUBVOL}/usr/var/lib/pacman")
+			#if echo "${pacman_subvol_set_ro_res}" | grep -Fqx "ERROR"; then
+			#	TASK_ERROR=1
+			#	TASK_ERROR_MSG="Cannot set /usr/var/lib/pacman subvolume as read-only"
+			#	STATE="FAIL"
+			#	continue
+			#fi
+
+			STATE="VERIFY"
 			;;
 		"VERIFY")
 			TASK_STATE="VERIFY"
 
 			# verify the subvolume integrity
+			TASK_MSG="Checking integrity of deployed image"
 			if btrfs scrub start -Bdr "${SUBVOL}"; then
 				# Verify the system installation status, check for device quirks, and prepare for cleanup
 				# Check if the FIRMWARE_OVERRIDE variable is set by the install media, if so enable firmware overrides
@@ -398,66 +336,77 @@ main() {
 				if [ ! -z ${deployment_to_be_removed} ]; then
 					echo "deleting ${deployment_to_be_removed}..."
 					btrfs subvolume delete ${DEPLOY_PATH}/${deployment_to_be_removed} || true
-					rm -rf ${MOUNT_PATH}/boot/${deployment_to_be_removed}
+					rm -rf "${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
 				fi
 			fi
 
-			# Migrations have been executed, frzr-tweaks and frzr-initramfs have been run: set the deployment subvolume back to being RO
-			local set_subvol_ro=$(btrfs_subvolume_set_ro "${SUBVOL}")
-			echo "Deployment Set RO: ${set_subvol_ro}"
-			if echo "${set_subvol_ro}" | grep -q 'OK'; then
-				# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-				local efi_update_result=$(prepare_efi_partition "${NAME}" "${efi_root_path}" ${SUBVOL} "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${deploy_systemd_boot_cfg}")
-				echo "EFI update: ${efi_update_result}"
-				if echo "${efi_update_result}" | grep -q 'OK'; then
-					rm -f ${MOUNT_PATH}/*.img.*
-
-					rm -rf /var/lib/pacman # undo frzr-unlock
-
-					local subvolid=$(btrfs_subvol_get_id "$SUBVOL")
-
-					if echo "$subvolid" | grep -Fqx "ERROR"; then
-						TASK_ERROR=1
-						TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
-						STATE="FAIL"
-					else
-						echo "SubvolID: ${subvolid}"
-
-						# Activates the new deployed image by making it the default btrfs subvolume, therefore what a systemd-equipped initramfs will load
-						btrfs subvolume set-default "$subvolid" "${MOUNT_PATH}"
-
-						STATE="SUCCESS"
-					fi
-				else # the bootloader could not be updated
-					TASK_ERROR=1
-					TASK_ERROR_MSG="Could not update the EFI partition"
-					STATE="FAIL"
-				fi
-			else
-				# Image could not be set back to ro: this wouldn't be a problem
-				# but indicates a greater problem and it's not safe to boot to it
-				# furthermore an newly deployed image is expected to be read-only
+			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
+			local efi_update_result=$(prepare_efi_partition "${NAME}" "${EFI_MOUNT_PATH}" ${SUBVOL} "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${deploy_systemd_boot_cfg}")
+			if echo "${efi_update_result}" | grep -q 'ERROR'; then
+				# bootloader configuration could not be updated
 				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not set the new image back in read-only state"
+				TASK_ERROR_MSG="Could not update the EFI partition: ${efi_update_result}"
 				STATE="FAIL"
+				continue
 			fi
 
-			# umount the efi path
-			umount -l ${efi_root_path}
+			# Remove download artifacts (if any)
+			rm -f ${MOUNT_PATH}/*.img.*
 
-			# umount the frzr_root subvolume
-			umount -l ${MOUNT_PATH}
+			rm -rf /var/lib/pacman # undo frzr-unlock
+
+			TASK_MSG="Finding deployment subvolume ID..."
+			local subvolid=$(btrfs_subvol_get_id "$SUBVOL")
+			if echo "$subvolid" | grep -Fqx "ERROR"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
+				STATE="FAIL"
+				continue
+			fi
+			
+			# Activates the new deployed image by making it the default btrfs subvolume
+			# systemd-equipped initramfs images will automount the default subvolume as the rootfs
+			TASK_MSG="Activating the new deployment (subvolid=${subvolid}) as the default subvolume..."
+			if ! btrfs subvolume set-default "$subvolid" "${MOUNT_PATH}"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not activate the new deployment"
+				STATE="FAIL"
+				continue
+			fi
+
+			STATE="SUCCESS"
 			;;
 		"SUCCESS")
 			# This state should only be used if the installation completed without errors
 			TASK_STATE="SUCCESS"
 
-			echo "deployment complete; restart to boot into ${NAME}"
+			# umount the efi path
+			if mountpoint -q ${EFI_MOUNT_PATH}; then
+				umount -l ${EFI_MOUNT_PATH}
+			fi
+
+			# umount the frzr_root subvolume
+			if mountpoint -q ${MOUNT_PATH}; then
+				umount -l ${MOUNT_PATH}
+			fi
+
+			TASK_MSG="Deployment is successful: reboot to boot into ${NAME}"
 
 			RUNNING=false
 			;;
 		"FAIL")
 			# This state should only be used if the installation failed
+			
+			# umount the efi path
+			if mountpoint -q ${EFI_MOUNT_PATH}; then
+				umount -l ${EFI_MOUNT_PATH}
+			fi
+
+			# umount the frzr_root subvolume
+			if mountpoint -q ${MOUNT_PATH}; then
+				umount -l ${MOUNT_PATH}
+			fi
+			
 			TASK_STATE="FAIL"
 			RUNNING=false
 			;;
