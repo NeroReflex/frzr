@@ -246,6 +246,8 @@ elif [ $function == "deploy" ]; then
     touch /tmp/frzr.lock
 
     frzr_check_bootenv
+    # We don't want to pass the function parameter to __frzr-deploy
+    shift
     source "${BASH_SOURCE%/*}/__frzr-deploy" "$@"
     RESULT=$?
 
