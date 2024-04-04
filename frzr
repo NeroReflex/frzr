@@ -196,7 +196,7 @@ write_tracker_file() {
 }
 
 # Write tracker file when frzr exits
-trap write_tracker_file SIGINT SIGTERM ERR
+trap write_tracker_file SIGINT SIGTERM EXIT ERR
 # Define a function to handle errors
 handle_error() {
     local function_name="$1"
