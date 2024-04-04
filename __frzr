@@ -1,17 +1,5 @@
 #! /bin/bash
 
-# Writes log output where it will be easy to fetch
-# $1 the message to be written
-# $2 (optional) severity: 1 for error, 2 for warning
-write_log() {
-	local msg=${1}
-	local severity=${2}
-
-	# TODO: make use of a parameter that is the location of the logfile
-	# TODO: append [ERROR] or [WARNING] or [INFO] depending on the severity
-	echo "$msg" | tee --append /tmp/frzr-deploy.log
-}
-
 # Check if the given directory is a btrfs subvolume
 # $1 the directory
 # return 0 if the directory is a subvolume, 1 otherwise

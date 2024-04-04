@@ -83,15 +83,17 @@ main() {
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
 			if ! mountpoint -q ${MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
+				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path..."
 				mkdir -p ${MOUNT_PATH}
 				mount -L frzr_root -t btrfs -o subvolid=5 ${MOUNT_PATH}
 				sleep 5
 			fi
 
 			if mountpoint -q ${MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
-				write_log "Using '${MOUNT_PATH}' as the main subvolume mount path"
-
 				DEPLOY_PATH=${MOUNT_PATH}/deployments
+
+				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path..."
+
 				mkdir -p ${DEPLOY_PATH}
 
 				# Make sure DEPLOY_PATH exists
@@ -102,12 +104,15 @@ main() {
 					continue
 				fi
 
-				write_log "Using '${DEPLOY_PATH}' as the deployment destination path"
-
 				local deploy_systemd_boot_cfg="frzr.conf"
+
+				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path..."
 
 				# Make sure the EFI partition is mounted during the deployment procedure
 				EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
+
+				TASK_MSG="Preparing '${EFI_MOUNT_PATH}' to be used as the EFI System path..."
+
 				if ! mountpoint -q ${EFI_MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
 					mkdir -p ${EFI_MOUNT_PATH}
 					mount -L frzr_efi ${EFI_MOUNT_PATH}
