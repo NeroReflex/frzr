@@ -288,7 +288,8 @@ main() {
 			fi
 
 			# Execute and migrations available in the image to be deployed
-			execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
+			# SKIPPING for now to prevent errors caused by conflicts with the systemd-migration hook in the images
+			#execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
 
 			# set that subvolume back to RO
 			#local $pacman_subvol_set_ro_res=$(btrfs_subvolume_set_ro "${SUBVOL}/usr/var/lib/pacman")
