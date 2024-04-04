@@ -210,7 +210,7 @@ while $RUNNING; do
 		if [ $RESULT -eq 0 ]; then
 			STATE="SUCCESS"
 		else
-			STATE="Fail"
+			STATE="FAIL"
 			continue
 		fi
 		;;
@@ -221,7 +221,7 @@ while $RUNNING; do
 		if [ $RESULT -eq 0 ]; then
 			STATE="SUCCESS"
 		else
-			STATE="Fail"
+			STATE="FAIL"
 			continue
 		fi
 		;;
