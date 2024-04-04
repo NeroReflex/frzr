@@ -168,7 +168,7 @@ frzr_status() {
         "IMG Name": "$IMG_NAME",
         "Base URL": "$BASE_URL",
         "Repo": "$REPO",
-        "Release URL": "$RELEASE_URL",
+        "Release URL": "$RELEASES_URL",
         "Expected Checksum": "$EXPECTED_CHECKSUM",
         "Actual Checksum": "$ACTUAL_CHECKSUM",
         "Channel": "$CHANNEL",
