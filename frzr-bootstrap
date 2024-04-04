@@ -160,11 +160,11 @@ if [ $EUID -ne 0 ]; then
 fi
 
 RUNNING=true
-STATE="CHECK"
+STATE="FRZR_BOOTSTRAP_CHECK"
 
 while $RUNNING; do
 	case "$STATE" in
-	"CHECK")
+	"FRZR_BOOTSTRAP_CHECK")
 		echo "Checking for drives connected to the system"
 		MOUNT_PATH=/tmp/frzr_root
 		device_list=()

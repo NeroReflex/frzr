@@ -30,6 +30,7 @@ fi
 UPGRADE=0
 REPAIR_INSTALL=0 # Set to 1 if you want to do a repair install. This should be set by frzr-bootstrap later if an existing install is found.
 NAME=""          # Name of the OS to be deployed
+EFI_MOUNT_PATH="" # EFI mount path
 MOUNT_PATH=""    # This is set as /tmp/frzr_root/ in the installer and /frzr_root during upgrades
 SUBVOL=""
 DEPLOY_PATH="" # ${MOUNT_PATH}/deployments
@@ -43,6 +44,7 @@ CHANNEL="" # The target channel to download the image from. Stable/Testing/Unsta
 RELEASES_URL=""
 EXPECTED_CHECKSUM="" # Expected checksum value of downloaded file
 ACTUAL_CHECKSUM=""   # Actual checksum of the file downloaded
+STATE=""
 
 frzr_check_bootenv() {
     if [ -d /tmp/frzr_root ]; then
@@ -156,6 +158,7 @@ frzr_status() {
         "Local Install": "$LOCAL_INSTALL",
         "Repair Install": "$REPAIR_INSTALL",
         "Show UI": "$SHOW_UI",
+        "EFI Path": "$EFI_MOUNT_PATH",
         "Mount Path": "$MOUNT_PATH",
         "SUBVOL": "$SUBVOL",
         "Deploy Path": "$DEPLOY_PATH",
@@ -168,7 +171,8 @@ frzr_status() {
         "Release URL": "$RELEASE_URL",
         "Expected Checksum": "$EXPECTED_CHECKSUM",
         "Actual Checksum": "$ACTUAL_CHECKSUM",
-        "Channel": "$CHANNEL"
+        "Channel": "$CHANNEL",
+        "State Machine State": "$STATE"
     }
 }
 EOF

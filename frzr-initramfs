@@ -6,11 +6,11 @@ if [ $EUID -ne 0 ]; then
 fi
 
 RUNNING=true
-STATE="BEGIN"
+STATE="FRZR_INITRAMFS_CHECK"
 
 while $RUNNING; do
     case "$STATE" in
-    "BEGIN")
+    "FRZR_INITRAMFS_CHECK")
         # Check whether this is an install, upgrade, or manual run
         if [ $UPGRADE -eq 1 ]; then
             echo "Doing an upgrade"

@@ -24,10 +24,10 @@ main() {
 	FRZR_PARAMS=""
 
 	local RUNNING=true
-	local STATE="CHECK"
+	STATE="FRZR_DEPLOY_CHECK"
 	while $RUNNING; do
 		case "$STATE" in
-		"CHECK")
+		"FRZR_DEPLOY_CHECK")
 			TASK_STATE="CHECK"
 			TASK_MSG="Checking for root privileges"
 			if [ $EUID -ne 0 ]; then
@@ -189,7 +189,7 @@ main() {
 				FILE_NAME=$(basename ${IMG_URL})
 				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
 				BASE_URL=$(dirname "${IMG_URL}")
-				CHECKSUM=$(curl --http1.1 -L -s "${BASE_URL}/sha256sum.txt" | cut -f -1 -d ' ')
+				EXPECTED_CHECKSUM=$(curl --http1.1 -L -s "${BASE_URL}/sha256sum.txt" | cut -f -1 -d ' ')
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
 				IMG_FILE="${MOUNT_PATH}/${FILE_NAME}"
 
@@ -233,8 +233,8 @@ main() {
 		"CHECKSUM")
 			TASK_STATE="CHECKSUM"
 			TASK_MSG="Verying checksums match"
-			CHECKSUM2=$(sha256sum "${IMG_FILE}" | cut -d' ' -f 1)
-			if [ "$CHECKSUM" != "$CHECKSUM2" ]; then
+			ACTUAL_CHECKSUM=$(sha256sum "${IMG_FILE}" | cut -d' ' -f 1)
+			if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
 				rm -f "${IMG_FILE}"
 
 				# We can attempt to redownload the image again here instead of aborting like the original behavior
