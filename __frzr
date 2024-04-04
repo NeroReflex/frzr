@@ -413,9 +413,14 @@ prepare_efi_partition() {
 					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "systemd"; then
 						echo "systemd hook has boon found"
 					else
+						echo '
 						# TODO: see https://wiki.archlinux.org/title/Mkinitcpio
 						# TODO: use sed to add systemd hooks replacing udev, usr and resume, and sd-vconsole replacing consolefont and keymap
 						# TODO: use the image mkinitcpio to regenerate the initramfs
+						# TODO: see https://wiki.archlinux.org/title/Mkinitcpio
+						# TODO: use sed to add systemd hooks replacing udev, usr and resume, and sd-vconsole replacing consolefont and keymap
+						# TODO: use the image mkinitcpio to regenerate the initramfs
+						'
 					fi
 
 					# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image

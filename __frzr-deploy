@@ -284,7 +284,7 @@ main() {
 			if [ -d "${SUBVOL}/efi" ]; then
 				mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL}/efi"
 			else
-				# TODO: warn about missing /efi
+				echo "TODO: missing /efi" # TODO: warn about missing /efi
 			fi
 
 			# Execute and migrations available in the image to be deployed
@@ -424,6 +424,9 @@ main() {
 	done
 }
 
-if [ "$0" = "$BASH_SOURCE" ]; then
-	main "$@"
-fi
+# Start the main() method like this for now since the old logic doesn't work
+main "$@"
+
+#if [ "$0" = "$BASH_SOURCE" ]; then
+#	main "$@"
+#fi
