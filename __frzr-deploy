@@ -304,6 +304,21 @@ main() {
 				mkdir -p "${SUBVOL}/var"
 			fi 
 
+			# mount home into the new deployment
+			if is_btrfs_subvolume "${MOUNT_PATH}/home"; then
+				local home_disk_uuid=$(get_uuid "${MOUNT_PATH}/home")
+				if echo "$subvolid" | grep -Fqx "ERROR"; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
+					STATE="FAIL"
+					continue
+				fi
+
+				mount -t btrfs -o rootflags=subvol=${MOUNT_PATH}/home,rw -U "${home_disk_uuid}" "${SUBVOL}/home"
+			elif mountpoint -q "/home"
+				mount --bind "/home" "${SUBVOL}/home"
+			fi
+
 			# bind-mount /efi of the newly deployed image
 			if [ -d "${SUBVOL}/efi" ]; then
 				mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL}/efi"
@@ -320,6 +335,11 @@ main() {
 				TASK_ERROR_MSG="Migrations on subvolume '$SUBVOL' failed: ${migrations_result}"
 				STATE="FAIL"
 				continue
+			fi
+
+			# umount the /home mount
+			if mountpoint -q "${SUBVOL}/home"; then
+				umount -l "${SUBVOL}/home"
 			fi
 
 			# umount the /efi bind-mount
