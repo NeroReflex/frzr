@@ -20,7 +20,7 @@ else
 	if echo "${UNLOCK_RESULT}" | grep -q 'OK'; then
 		systemctl daemon-reload
 
-		echo "frzr deployment ${DEPLOYMENT} unlocked"
+		echo "frzr deployment ${DEPLOYMENT} unlock succeeded"
 	else
 		echo "frzr deployment ${DEPLOYMENT} unlock failed: cannot set subvolume to r/w"
 		exit 1
