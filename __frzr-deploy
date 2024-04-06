@@ -83,7 +83,7 @@ main() {
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
 			if ! mountpoint -q ${MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
-				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path..."
+				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				mkdir -p ${MOUNT_PATH}
 				mount -L frzr_root -t btrfs -o subvolid=5 ${MOUNT_PATH}
 				sleep 5
@@ -92,7 +92,7 @@ main() {
 			if mountpoint -q ${MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
 				DEPLOY_PATH=${MOUNT_PATH}/deployments
 
-				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path..."
+				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path"
 
 				mkdir -p ${DEPLOY_PATH}
 
@@ -106,12 +106,12 @@ main() {
 
 				local deploy_systemd_boot_cfg="frzr.conf"
 
-				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path..."
+				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path"
 
 				# Make sure the EFI partition is mounted during the deployment procedure
 				EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
 
-				TASK_MSG="Preparing '${EFI_MOUNT_PATH}' to be used as the EFI System path..."
+				TASK_MSG="Preparing '${EFI_MOUNT_PATH}' to be used as the EFI System path"
 
 				if ! mountpoint -q ${EFI_MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
 					mkdir -p ${EFI_MOUNT_PATH}
@@ -199,7 +199,7 @@ main() {
 					if [ "$UPGRADE" -eq 0 ]; then
 						MSG="${NAME} is already installed, would you like to delete this and re-deploy?"
 						if (whiptail --yesno "${MSG}" 10 50); then
-							echo "deleting ${NAME}..."
+							echo "deleting ${NAME}"
 							btrfs subvolume delete ${SUBVOL}
 							rm -rf "${EFI_MOUNT_PATH}/${NAME}"
 						fi
@@ -219,7 +219,7 @@ main() {
 					curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
 						stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 91 %
 				elif [ -z ${SHOW_UI} ]; then
-					echo "downloading ${NAME}..."
+					echo "downloading ${NAME}"
 					curl --http1.1 -L -o "${IMG_FILE}" -C - "${IMG_URL}"
 				else
 					curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
@@ -261,7 +261,7 @@ main() {
 
 			# Use BTRFS receive to install the image
 			if [ -z ${SHOW_UI} ]; then
-				echo "Installing ${NAME}..."
+				echo "Installing image ${NAME}"
 			else
 				# TODO: verify if this really works
 				whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
@@ -279,37 +279,34 @@ main() {
 		"INSTALL")
 			TASK_STATE="INSTALL"
 			
-			# TODO: use correct (unrenamed) files
-			local vmlinuz_name="vmlinuz-linux"
-			local initramfs_name="initramfs-linux.img"
+			local kernel_name="linux"
+			if [ -f "${SUBVOL}/frzr_kernel" ]; then
+				kernel_name=$(cat "${SUBVOL}/frzr_kernel")
+			else
+				TASK_WARNING=1
+				TASK_WARNING_MSG="No kernel name specified: '${kernel_name}' will be used as the defult"
+			fi
 
-			# Migrations should be able to modify the new installed image: set ${SUBVOL} R/W
-			#local set_subvol_rw=$(btrfs_subvolume_set_rw "${SUBVOL}")
-			#if echo "${set_subvol_rw}" | grep -Fqx 'ERROR'; then
-			#	TASK_ERROR=1
-			#	TASK_ERROR_MSG="Cannot set ${SUBVOL} R/W: ${set_subvol_rw}"
-			#	STATE="FAIL"
-			#	continue
-			#fi
+			local vmlinuz_name="vmlinuz-${kernel_name}"
+			local initramfs_name="initramfs-${kernel_name}.img"
 
+			# TODO: with the filesystem unlocked create /efi if it does not exists
 			if [ -d "${SUBVOL}/efi" ]; then
 				mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL}/efi"
 			else
-				echo "TODO: missing /efi" # TODO: warn about missing /efi
+				TASK_WARNING=1
+				TASK_WARNING_MSG="Could not mount ESP partition because image does not have a /efi directory"
 			fi
 
-			# Execute and migrations available in the image to be deployed
-			# SKIPPING for now to prevent errors caused by conflicts with the systemd-migration hook in the images
-			#execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" # TODO: some old migrations are incompatible with the current model: use some newer migration scheme!
-
-			# set that subvolume back to RO
-			#local $pacman_subvol_set_ro_res=$(btrfs_subvolume_set_ro "${SUBVOL}/usr/var/lib/pacman")
-			#if echo "${pacman_subvol_set_ro_res}" | grep -Fqx "ERROR"; then
-			#	TASK_ERROR=1
-			#	TASK_ERROR_MSG="Cannot set /usr/var/lib/pacman subvolume as read-only"
-			#	STATE="FAIL"
-			#	continue
-			#fi
+			# Execute any migrations available in the image to be deployed
+			TASK_MSG="Executing deployment migrations"
+			local migrations_result=$(execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}")
+			if echo "${migrations_result}" | grep -Fqx "ERROR"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Migrations on subvolume '$SUBVOL' failed: ${migrations_result}"
+				STATE="FAIL"
+				continue
+			fi
 
 			STATE="VERIFY"
 			;;
@@ -351,14 +348,43 @@ main() {
 				local deployment_to_be_removed=$(get_deployment_to_delete ${CURRENT} ${BOOT_CFG} ${DEPLOY_PATH})
 
 				if [ ! -z ${deployment_to_be_removed} ]; then
-					echo "deleting ${deployment_to_be_removed}..."
+					echo "deleting deployment ${deployment_to_be_removed}"
 					btrfs subvolume delete ${DEPLOY_PATH}/${deployment_to_be_removed} || true
 					rm -rf "${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
 				fi
 			fi
 
+			# Get the rootfs UUID: this will be used in generating the systemd-boot entry
+			TASK_MSG="Finding deployment partition UUID"
+			local rootfs_uuid=$(get_uuid "$SUBVOL")
+			if echo "$rootfs_uuid" | grep -Fqx "ERROR"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not find rootfs UUID of the new deployment"
+				STATE="FAIL"
+				continue
+			fi
+
+			# Get the subvolid: this will be used in generating the systemd-boot entry and setting is as the default for the automatic boot
+			TASK_MSG="Finding deployment subvolume ID"
+			local rootfs_subvolid=$(btrfs_subvol_get_id "$SUBVOL")
+			if echo "$subvolid" | grep -Fqx "ERROR"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
+				STATE="FAIL"
+				continue
+			fi
+
+			# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
+			local additional_arguments=""
+			if [ -f ${SUBVOL}/usr/lib/frzr.d/bootconfig.conf ]; then
+				additional_arguments="$additional_arguments $(cat ${SUBVOL}/usr/lib/frzr.d/bootconfig.conf)"
+			else
+				TASK_WARNING=1
+				TASK_WARNING_MSG="Could not read '${SUBVOL}/usr/lib/frzr.d/bootconfig.conf': default kernel cmdline will be used"
+			fi
+
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-			local efi_update_result=$(prepare_efi_partition "${NAME}" "${EFI_MOUNT_PATH}" ${SUBVOL} "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${deploy_systemd_boot_cfg}")
+			local efi_update_result=$(prepare_efi_partition "${NAME}" "${EFI_MOUNT_PATH}" ${SUBVOL} "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${deploy_systemd_boot_cfg}" "${rootfs_uuid}" "${rootfs_subvolid}")
 			if echo "${efi_update_result}" | grep -q 'ERROR'; then
 				# bootloader configuration could not be updated
 				TASK_ERROR=1
@@ -372,18 +398,9 @@ main() {
 
 			rm -rf /var/lib/pacman # undo frzr-unlock
 
-			TASK_MSG="Finding deployment subvolume ID..."
-			local subvolid=$(btrfs_subvol_get_id "$SUBVOL")
-			if echo "$subvolid" | grep -Fqx "ERROR"; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
-				STATE="FAIL"
-				continue
-			fi
-			
 			# Activates the new deployed image by making it the default btrfs subvolume
 			# systemd-equipped initramfs images will automount the default subvolume as the rootfs
-			TASK_MSG="Activating the new deployment (subvolid=${subvolid}) as the default subvolume..."
+			TASK_MSG="Activating the new deployment (subvolid=${subvolid}) as the default subvolume"
 			if ! btrfs subvolume set-default "$subvolid" "${MOUNT_PATH}"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not activate the new deployment"
