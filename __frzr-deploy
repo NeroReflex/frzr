@@ -290,7 +290,21 @@ main() {
 			local vmlinuz_name="vmlinuz-${kernel_name}"
 			local initramfs_name="initramfs-${kernel_name}.img"
 
-			# TODO: with the filesystem unlocked create /efi if it does not exists
+			local deployment_set_rw_result=$(btrfs_subvolume_set_rw "$SUBVOL")
+			if echo "${deployment_set_rw_result}" | grep -Fqx "ERROR"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not set subvolume '$SUBVOL' R/W: ${deployment_set_rw_result}"
+				STATE="FAIL"
+				continue
+			else
+				# With the filesystem unlocked create standard directories systemd can automount partitions to
+				mkdir -p "${SUBVOL}/efi"
+				mkdir -p "${SUBVOL}/home"
+				mkdir -p "${SUBVOL}/srv"
+				mkdir -p "${SUBVOL}/var"
+			fi 
+
+			# bind-mount /efi of the newly deployed image
 			if [ -d "${SUBVOL}/efi" ]; then
 				mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL}/efi"
 			else
@@ -306,6 +320,11 @@ main() {
 				TASK_ERROR_MSG="Migrations on subvolume '$SUBVOL' failed: ${migrations_result}"
 				STATE="FAIL"
 				continue
+			fi
+
+			# umount the /efi bind-mount
+			if mountpoint -q "${SUBVOL}/efi"; then
+				umount -l "${SUBVOL}/efi"
 			fi
 
 			STATE="VERIFY"

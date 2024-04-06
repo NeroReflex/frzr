@@ -313,44 +313,7 @@ execute_migrations() {
 
 	if compgen -G "${deployment}"/usr/lib/frzr.d/*.migration >/dev/null; then
 		for m in "${deployment}"/usr/lib/frzr.d/*.migration; do
-			unset -f post_install_ro
-			unset -f post_install_rw
-			. $m
-
-			if [ "$(type -t post_install_ro)" == function ]; then
-				local migration_result=$(post_install_ro "${frzr_root}" "${deployment}" "${version}")
-
-				if echo "${migration_result}" | grep -Fqx "ERROR"; then
-					echo "ERROR: Could not execute migration post_install_ro for ${m}: ${migration_result}"
-					break
-				fi
-			fi
-
-			if [ "$(type -t post_install_rw)" == function ]: then
-				# This migration should be able to modify the newly installed image: set ${SUBVOL} R/W
-				LAST_SET_SUBVOL_RW=$(btrfs_subvolume_set_rw "${deployment}")
-				if echo "${LAST_SET_SUBVOL_RW}" | grep -Fqx 'ERROR'; then
-					echo "ERROR: Cannot set ${deployment} R/W: ${LAST_SET_SUBVOL_RW}"
-					break
-				fi
-
-				local migration_result=$(post_install_rw "${frzr_root}" "${deployment}" "${version}")
-
-				if echo "${migration_result}" | grep -Fqx "ERROR"; then
-					echo "ERROR: Could not execute migration post_install_rw for ${m}: ${migration_result}"
-					break
-				fi
-
-				# After executing the current migration set the newly installed image back to RO
-				LAST_SET_SUBVOL_RO=$(btrfs_subvolume_set_ro "${deployment}")
-				if echo "${LAST_SET_SUBVOL_RO}" | grep -Fqx "ERROR"; then
-					echo "ERROR: Cannot set ${deployment} R/W: ${LAST_SET_SUBVOL_RO}"
-					break
-				fi
-			fi
-
-			unset -f post_install_ro
-			unset -f post_install_rw
+			# TODO: use something like arch-chroot to execute commands from the final image
 		done
 	fi
 }
