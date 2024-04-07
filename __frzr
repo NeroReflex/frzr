@@ -8,6 +8,11 @@ get_uuid() {
 
 	if [ -d "${dir}" ]; then
 		local subcmd=$(df -P "${dir}" | tail -n1 | cut -d' ' -f1)
+
+		if [ "$subcmd" = "-" ]; then
+			subcmd=$(findmnt --target "${dir}" | grep "/dev" | tail -n1 | cut -d' ' -f2 )
+		fi
+
 		local possible_uuid=$(lsblk -n -o UUID "${subcmd}")
 		local filtered_uuid=$(echo "${possible_uuid}" | grep -E '[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}')
 
