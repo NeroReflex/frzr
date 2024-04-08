@@ -57,6 +57,11 @@ fresh_install() {
 		declare -i ROOT_GIB=0
 	fi
 
+	# $SEPARATE_HOME_FS can be either btrfs or ext4
+	if [ -z ${SEPARATE_HOME_FS:-} ]; then
+		SEPARATE_HOME_FS="ext4"
+	fi
+
 	if [[ $SWAP_GIB -eq 0 ]]; then
 		SWAP_PART_NUMBER=0
 		ROOT_PART_NUMBER=2
@@ -95,7 +100,7 @@ fresh_install() {
 	
 	if [[ $SWAP_PART_NUMBER -ne 0 ]]; then
 		parted --script ${disk} \
-			mkpart primary linux-swap ${SWAP_START}GiB ${SWAP_END}GiB \
+			mkpart primary "frzr_swap" linux-swap ${SWAP_START}GiB ${SWAP_END}GiB \
 			type $SWAP_PART_NUMBER "0657fd6d-a4ab-43c4-84e5-0933c84b4f4f"
 	fi
 
@@ -103,17 +108,18 @@ fresh_install() {
 		# split / and /home in to partitions
 
 		parted --script ${disk} \
-			mkpart primary ${ROOT_START}GiB ${ROOT_END}GiB \
+			mkpart primary btrfs ${ROOT_START}GiB ${ROOT_END}GiB \
 			type $ROOT_PART_NUMBER "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709"
 
 		parted --script ${disk} \
-			mkpart primary ${HOME_START}GiB 100% \
-			type $HOME_PART_NUMBER "933ac7e1-2eb4-4f13-b844-0e14e2aef915"
+			mkpart primary $SEPARATE_HOME_FS ${HOME_START}GiB 100% \
+			type $HOME_PART_NUMBER "933ac7e1-2eb4-4f13-b844-0e14e2aef915" \
+			set 4 linux-home on
 	else
 		# /home will be a subvolume of / (default)
 
 		parted --script ${disk} \
-			mkpart primary ${ROOT_START}GiB 100% \
+			mkpart primary btrfs ${ROOT_START}GiB 100% \
 			type $ROOT_PART_NUMBER "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709"
 	fi
 
@@ -149,18 +155,30 @@ fresh_install() {
 	# setup home partition
 	if [[ $HOME_PART_NUMBER -ne 0 ]]; then
 		local home_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${HOME_PART_NUMBER}$")
-		mkfs.btrfs -L frzr_home -f ${home_part}
+		
+		if [[ SEPARATE_HOME_FS == "ext4" ]]; then
+			mkfs.ext4 -L frzr_home -f ${home_part}
+		else
+			mkfs.btrfs -L frzr_home -f ${home_part}
+		fi
+		
 		mkdir -p ${frzr_root}/home
-		mount -t btrfs -o nodatacow ${home_part} ${frzr_root}/home
+		mount ${home_part} ${frzr_root}/home
+		
+		# set the /home as no copy-on-write if that is a btrfs filesystem
+		if [[ SEPARATE_HOME_FS == "btrfs" ]]; then
+			chattr +C "${frzr_root}/home"
+		fi
+
 		local home_uuid=$(blkid -s UUID -o value "${home_part}")
 		echo "${home_uuid}" >${frzr_root}/home_uuid
 	else
 		# create /home subvolume
 		btrfs subvolume create ${frzr_root}/home
-	fi
 
-	# set the /home as no copy-on-write
-	chattr +C "${frzr_root}/home"
+		# set the /home as no copy-on-write
+		chattr +C "${frzr_root}/home"
+	fi
 
 	# create folder for the gamer user
 	mkdir -p ${frzr_root}/home/${USERNAME}
