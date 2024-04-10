@@ -436,22 +436,6 @@ main() {
 			TASK_STATE="CLEANUP"
 			# Delete the downloaded system img etc.
 
-			# delete deployments under these conditions:
-			# - we are currently running inside a frzr deployment (i.e. not during install)
-			# - the deployment is not currently running
-			# - the deployment is not configured to be run on next boot
-			if echo "${CURRENT}" | grep -Fqx 'ERROR'; then
-				TASK_WARNING=1
-				TASK_WARNING_MSG="Could not retrieve deployment to keep: ${CURRENT}"				
-			else
-				local deployment_to_be_removed=$(get_deployment_to_delete ${CURRENT} ${BOOT_CFG} ${DEPLOY_PATH})
-
-				if [ ! -z ${deployment_to_be_removed} ]; then
-					echo "deleting deployment ${deployment_to_be_removed}"
-					btrfs subvolume delete ${DEPLOY_PATH}/${deployment_to_be_removed} || true
-					rm -rf "${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
-				fi
-			fi
 
 			# Get the rootfs UUID: this will be used in generating the systemd-boot entry
 			TASK_MSG="Finding deployment partition UUID"
@@ -503,6 +487,40 @@ main() {
 				TASK_ERROR_MSG="Could not activate the new deployment"
 				STATE="FAIL"
 				continue
+			fi
+
+			# After the new image has been deployed and is bootable
+			# delete old deployments under these conditions:
+			# - we are currently running inside a frzr deployment (i.e. not during install)
+			# - the deployment is not currently running
+			# - the deployment is not configured to be run on next boot
+			if echo "${CURRENT}" | grep -Fqx 'ERROR'; then
+				TASK_WARNING=1
+				TASK_WARNING_MSG="Could not retrieve deployment to keep: ${CURRENT}"				
+			else
+				local deployment_to_be_removed=$(get_deployment_to_delete ${CURRENT} ${BOOT_CFG} ${DEPLOY_PATH})
+
+				if [ ! -z ${deployment_to_be_removed} ]; then
+					# remove all sub-subvolumes of the deployment and the deployment itself (use "deployments" as grep to avoid deleting something else)
+					TASK_MSG="deleting deployment ${deployment_to_be_removed}"
+					local deployment_removal_result=$(btrfs_filtered_subvolume_recursive_delete "${DEPLOY_PATH}/${deployment_to_be_removed}" "deployments")
+					if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
+						TASK_ERROR=1
+						TASK_ERROR_MSG="Could not delete the new deployment, however the new one will still boot"
+						STATE="SUCCESS"
+						continue
+					fi
+
+					if [ -f "${EFI_MOUNT_PATH}/${deployment_to_be_removed}" ]; then
+						TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${deployment_to_be_removed}'"
+						rm -rf "${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
+					fi
+					
+					if [ -f "${EFI_MOUNT_PATH}/loader/entries/${NAME}.conf" ]; then
+						TASK_MSG="deleting deployment boot entry '${EFI_MOUNT_PATH}/loader/entries/${NAME}.conf'"
+						rm -rf "${EFI_MOUNT_PATH}/loader/entries/${NAME}.conf"
+					fi
+				fi
 			fi
 
 			STATE="SUCCESS"

@@ -56,7 +56,12 @@ btrfs_filtered_subvolume_recursive_delete() {
 
 	if [-d "${dir}" ]; then
 		if is_btrfs_subvolume "${dir}"; then
-			local subvol_list=$(btrfs subvolume list --sort=-path "${dir}" | grep "${expr}")
+			btrfs subvolume list --sort=-path "${dir}" | grep "${expr}" | cut -d ' ' -f 9 | \
+			while read subvol_path; do
+				btrfs subvolume delete "${subvol_path}"
+			done
+
+			echo "OK"
 		else
 			echo "ERROR: Directory '${dir}' is not a valid btrfs subvolume"
 		fi
