@@ -340,40 +340,52 @@ main() {
 			fi
 
 			# TODO: the following code that prepare /etc and /var overlays should only be done if requested by the operating system
-
+			# ======================================================================================================================
 			# restore current /etc and /var overlays if possible or create new ones
 			if echo "${CURRENT}" | grep -Fqx 'ERROR'; then
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Error fetching the current frzr deployment: ${CURRENT}"
 
-				btrfs subvolume create "${SUBVOL}/etc_overlay"
-				btrfs subvolume create "${SUBVOL}/var_overlay"
-			elif is_btrfs_subvolume "${DEPLOY_PATH}/${CURRENT}/etc_overlay" && is_btrfs_subvolume "${DEPLOY_PATH}/${CURRENT}/var_overlay"; then
-				btrfs send --quiet "${DEPLOY_PATH}/${CURRENT}/etc_overlay" | btrfs receive --quiet "${SUBVOL}"
-				btrfs send --quiet "${DEPLOY_PATH}/${CURRENT}/var_overlay" | btrfs receive --quiet "${SUBVOL}"
-				
-				local etc_overlay_set_rw=$(btrfs_subvolume_set_rw "${SUBVOL}/etc_overlay")
-				if echo "etc_overlay_set_rw" | grep -Fqx "ERROR"; then
+				local sysroot_subvol_creation_result=$(prepare_empty_sysroot_overlay "${SUBVOL}/sysroot")
+				if echo "${sysroot_subvol_creation_result}" | grep -Fqx "ERROR"; then
 					TASK_ERROR=1
-					TASK_ERROR_MSG="Could not set /etc overlay RW: ${etc_overlay_set_rw}"
+					TASK_ERROR_MSG="Could not create overlayfs: ${sysroot_subvol_creation_result}"
+					STATE="FAIL"
+					continue
+				fi
+			elif is_btrfs_subvolume "${DEPLOY_PATH}/${CURRENT}/sysroot"; then
+				TASK_MSG="Import current /etc and /var overlays to the new deployment..."
+        		btrfs snapshot "${DEPLOY_PATH}/${CURRENT}/sysroot" "${SUBVOL}/sysroot"
+			elif [ -d "${MOUNT_PATH}/etc" ] && [ -d "${MOUNT_PATH}/.etc" ]; then
+				local sysroot_subvol_creation_result=$(prepare_empty_sysroot_overlay "${SUBVOL}/sysroot")
+				if echo "${sysroot_subvol_creation_result}" | grep -Fqx "ERROR"; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not create overlayfs: ${sysroot_subvol_creation_result}"
 					STATE="FAIL"
 					continue
 				fi
 
-				local var_overlay_set_rw=$(btrfs_subvolume_set_rw "${SUBVOL}/var_overlay")
-				if echo "${var_overlay_set_rw}" | grep -Fqx "ERROR"; then
-					TASK_ERROR=1
-					TASK_ERROR_MSG="Could not set /var overlay RW: ${var_overlay_set_rw}"
-					STATE="FAIL"
-					continue
-				fi
-			else
-				TASK_WARNING=1
-				TASK_WARNING_MSG="No existing overlays exists yet"
+				cp -a "${MOUNT_PATH}/etc" "${SUBVOL}/sysroot/"
+				cp -a "${MOUNT_PATH}/.etc" "${SUBVOL}/sysroot/"
+				cp -a "/var" "${SUBVOL}/sysroot/"
 
-				btrfs subvolume create "${SUBVOL}/etc_overlay"
-				btrfs subvolume create "${SUBVOL}/var_overlay"
+				rmdir "${SUBVOL}/sysroot/etc_overlay/upper"
+				rmdir "${SUBVOL}/sysroot/etc_overlay/workdir"
+				rmdir "${SUBVOL}/sysroot/var_overlay/upper"
+
+				mv "${SUBVOL}/sysroot/etc" "${SUBVOL}/sysroot/etc_overlay/upper"
+				mv "${SUBVOL}/sysroot/.etc" "${SUBVOL}/sysroot/etc_overlay/workdir"
+				mv "${SUBVOL}/sysroot/var" "${SUBVOL}/sysroot/var_overlay/upper"
 			fi
+
+			local sysroot_set_rw=$(btrfs_subvolume_set_rw "${SUBVOL}/sysroot")
+			if echo "${sysroot_set_rw}" | grep -Fqx "ERROR"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not set /sysroot subvol RW: ${sysroot_set_rw}"
+				STATE="FAIL"
+				continue
+			fi
+			# ======================================================================================================================
 
 			# umount the /home mount
 			if mountpoint -q "${SUBVOL}/home"; then
@@ -383,26 +395,6 @@ main() {
 			# umount the /efi bind-mount
 			if mountpoint -q "${SUBVOL}/efi"; then
 				umount -l "${SUBVOL}/efi"
-			fi
-
-			if is_btrfs_subvolume "${SUBVOL}/etc_overlay"; then
-				mkdir -p "${SUBVOL}/etc_overlay/upper"
-				mkdir -p "${SUBVOL}/etc_overlay/workdir"
-			else
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not prepare the /etc overlay subvolume '${SUBVOL}/etc_overlay'"
-				STATE="FAIL"
-				continue
-			fi
-
-			if is_btrfs_subvolume "${SUBVOL}/var_overlay"; then
-				mkdir -p "${SUBVOL}/var_overlay/upper"
-				mkdir -p "${SUBVOL}/var_overlay/workdir"
-			else
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not prepare the /var overlay subvolume '${SUBVOL}/var_overlay'"
-				STATE="FAIL"
-				continue
 			fi
 
 			STATE="VERIFY"

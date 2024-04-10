@@ -430,7 +430,7 @@ generate_systemd_boot_cfg() {
 	fi
 }
 
-# Write the systemd-boot entry needed to boot the specified deployment
+# Write the systemd-boot entry needed to make the specified deployment bootable.
 # Note: this function can ignore amd-ucode and intel-ucode if those are not found since mkinitcpio will place those
 # in the initramfs and including them on systemd-boot is now deprecated.
 # PRE=the deployment image is available to be read from
@@ -446,8 +446,7 @@ generate_systemd_boot_cfg() {
 # $9  entry config file name (mind not inserting a final /)
 # $10 the UUID of the btrfs rootfs partition containing the deployment to boot
 # $11 the btrfs subvolume ID of the deployment to boot
-# stdout the configuration to be written to a systemd-boot entry to make the given deployment version bootable
-# return "OK" for success, and error string otherwise"
+# stdout "OK" for success, and error string otherwise
 prepare_efi_partition() {
 	local version=${1}
 	local efi_mount_path=${2}
@@ -529,5 +528,27 @@ prepare_efi_partition() {
 		fi
 	else
 		echo "ERROR: could not create path '${efi_mount_path}/loader/entries' system will not be bootable"
+	fi
+}
+
+# Prepare an empty overlay that can host every modification made to a deployment
+# PRE=deployment_subvol is an unmodified deployment
+# POST=deployment_subvol can be overlayed at the next boot
+# $1 the path to the (R/W) deployment to be overlayed
+# stdout "OK" for success, and error string otherwise
+prepare_empty_sysroot_overlay() {
+	local deployment_subvol=${1}
+
+	if btrfs subvolume create "${deployment_subvol}/sysroot"; then
+		if is_btrfs_subvolume "${deployment_subvol}/sysroot"; then
+			mkdir -p "${deployment_subvol}/sysroot/etc_overlay/upper"
+			mkdir -p "${deployment_subvol}/sysroot/etc_overlay/workdir"
+			mkdir -p "${deployment_subvol}/sysroot/var_overlay/upper"
+			mkdir -p "${deployment_subvol}/sysroot/var_overlay/workdir"
+		else
+			echo "ERROR: Creation of subvolume '${deployment_subvol}/sysroot' silently failed"
+		fi
+	else
+		echo "ERROR: Could not create '${deployment_subvol}/sysroot' subvolume"
 	fi
 }
