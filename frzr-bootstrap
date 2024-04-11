@@ -12,43 +12,76 @@ repair_install() {
 	local disk=${1}
 	local frzr_root=${2}
 
-	local install_mount=$(fdisk -o Device --list ${disk} | grep "^${disk}.*2$")
+	# 1st partition is always EFI
 	local boot_efi=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
-	
+
+	# start frzr_root search from partition 2 (1st partition is always EFI)
+	local frzr_root_part_number=2
+	local install_mount=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${frzr_root_part_number}$")
 	local install_mount_label=$(blkid -s LABEL -o value "${install_mount}")
-	if [[ $install_mount_label != "frzr_root" ]]; then
-		# The second partition is the swap, try the third
-		install_mount=$(fdisk -o Device --list ${disk} | grep "^${disk}.*3$")
+	
+	while [ $frzr_root_part_number -le 10 ] && [[ $install_mount_label != "frzr_root" ]]
+	do
+		((frzr_root_part_number++))
+		install_mount=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${frzr_root_part_number}$")
 		install_mount_label=$(blkid -s LABEL -o value "${install_mount}")
-	fi
+	done
 	
 	if [[ $install_mount_label != "frzr_root" ]]; then
-		# TODO: abort: frzr_root not found
-	fi
+		# make sure the directory to be used as the frzr_root mountpoint does exists
+		mkdir -p "${frzr_root}"
 
-	mount -t btrfs -o subvolid=5,rw "${install_mount}" "${frzr_root}"
+		# mount the frzr_root partition
+		mount -t btrfs -o subvolid=5,rw "${install_mount}" "${frzr_root}"
 
-	mkdir -p "${frzr_root}"
-	mkdir -p "${frzr_root}/boot"
-	mkdir -p "${frzr_root}/efi"
+		# set the default subvol back to 5 as the fresh installation did
+		btrfs subvolume set-default 5 "${frzr_root}"
 
-	mount -t vfat "${boot_efi}" "${frzr_root}/efi/"
-	rm -rf ${frzr_root}/efi/*
-	bootctl --esp-path="${frzr_root}/efi/" install
+		# mkdir required directories
+		mkdir -p "${frzr_root}/boot"
+		mkdir -p "${frzr_root}/efi"
 
-	echo "deleting subvolume(s)..."
-	btrfs subvolume delete ${frzr_root}/deployments/* || true
+		# clear out the etc overlay upperdir
+		if [ -d "${frzr_root}/etc/" ]; then
+			rm -rf ${frzr_root}/etc/*
+		else
+			mkdir -p "${frzr_root}/etc/"
+		fi
 
-	if [ -d "${frzr_root}/etc/" ]; then
-		rm -rf ${frzr_root}/etc/*
+		# clear out the etc overlay workdir
+		if [ -d "${frzr_root}/.etc/" ]; then
+			rm -rf ${frzr_root}/.etc/*
+		else
+			mkdir -p "${frzr_root}/.etc/"
+		fi
+
+		# clear out the /var subvolume
+		if [ ! -d "${frzr_root}/var" ]; then
+			btrfs subvolume create ${frzr_root}/var
+		elif is_btrfs_subvolume "${frzr_root}/var"; then
+			rm -rf ${frzr_root}/var/*
+		fi
+
+		# mount the EFI partition
+		mount -t vfat "${boot_efi}" "${frzr_root}/efi/"
+		
+		# remove everything from the EFI partition
+		rm -rf ${frzr_root}/efi/*
+
+		# reinstall the bootloader
+		bootctl --esp-path="${frzr_root}/efi/" install
+
+		# Delete every installed system
+		if [ -d ${frzr_root}/deployments ]; then
+			echo "deleting subvolume(s)..."
+			btrfs subvolume delete ${frzr_root}/deployments/* || true
+		fi
+
+		# TODO: if a minimal/recovery system has to installed in the main partition here is the place to do just that.
+
+		echo "OK"
 	else
-		mkdir -p "${frzr_root}/.etc/"
-	fi
-
-	if [ -d "${frzr_root}/.etc/" ]; then
-		rm -rf ${frzr_root}/.etc/*
-	else
-		mkdir -p "${frzr_root}/.etc/"
+		echo "ERROR: frzr_root not found"
 	fi
 }
 
@@ -129,7 +162,6 @@ fresh_install() {
 			set 4 linux-home on
 	else
 		# /home will be a subvolume of / (default)
-
 		parted --script ${disk} \
 			mkpart primary btrfs ${ROOT_START}GiB 100% \
 			type $ROOT_PART_NUMBER "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709"
@@ -197,7 +229,6 @@ fresh_install() {
 	chown 1000:1000 ${frzr_root}/home/${USERNAME}
 
 	# TODO: if a minimal/recovery system has to installed in the main partition here is the place to do just that.
-
 }
 
 if [ $EUID -ne 0 ]; then
@@ -262,9 +293,8 @@ while $RUNNING; do
 		;;
 	"REPAIR")
 		echo "We are doing a repair install"
-		repair_install "${DISK}" "${MOUNT_PATH}"
-		RESULT=$?
-		if [ $RESULT -eq 0 ]; then
+		local repair_install_result=$(repair_install "${DISK}" "${MOUNT_PATH}")
+		if echo "$repair_install_result" | grep -Fqx "OK"; then
 			STATE="SUCCESS"
 		else
 			STATE="FAIL"
