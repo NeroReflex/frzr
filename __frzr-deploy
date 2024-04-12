@@ -355,7 +355,12 @@ main() {
 				fi
 			elif is_btrfs_subvolume "${DEPLOY_PATH}/${CURRENT}/sysroot"; then
 				TASK_MSG="Import current /etc and /var overlays to the new deployment..."
-        		btrfs snapshot "${DEPLOY_PATH}/${CURRENT}/sysroot" "${SUBVOL}/sysroot"
+        		if ! btrfs snapshot "${DEPLOY_PATH}/${CURRENT}/sysroot" "${SUBVOL}/sysroot"; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not snapshot the current overlay: ${sysroot_subvol_creation_result}"
+					STATE="FAIL"
+					continue
+				fi
 			elif [ -d "${MOUNT_PATH}/etc" ] && [ -d "${MOUNT_PATH}/.etc" ]; then
 				local sysroot_subvol_creation_result=$(prepare_empty_sysroot_overlay "${SUBVOL}/sysroot")
 				if echo "${sysroot_subvol_creation_result}" | grep -Fqx "ERROR"; then
