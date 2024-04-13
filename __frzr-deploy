@@ -280,13 +280,20 @@ main() {
 			;;
 		"INSTALL")
 			TASK_STATE="INSTALL"
-			
-			local kernel_name="linux"
-			if [ -f "${SUBVOL}/frzr_kernel" ]; then
-				kernel_name=$(cat "${SUBVOL}/frzr_kernel")
+
+			if [ -f "${SUBVOL}/etc/frzr-manifest" ]; then
+				source "${SUBVOL}/etc/frzr-manifest"
 			else
 				TASK_WARNING=1
+				TASK_WARNING_MSG="No /etc/frzr-manifest found in the deployment. Default options will be used."
+			fi
+			
+			local kernel_name="linux"
+			if [ -z $FRZR_DEPLOYMENT_KERNEL_NAME ]; then
+				TASK_WARNING=1
 				TASK_WARNING_MSG="No kernel name specified: '${kernel_name}' will be used as the defult"
+			else
+				kernel_name=$(echo "${FRZR_DEPLOYMENT_KERNEL_NAME}")
 			fi
 
 			local vmlinuz_name="vmlinuz-${kernel_name}"
@@ -307,99 +314,38 @@ main() {
 			fi 
 
 			# mount home into the new deployment
+			SUBVOL_HOME_MOUNT="${SUBVOL}/home"
 			if is_btrfs_subvolume "${MOUNT_PATH}/home"; then
-				local home_disk_uuid=$(get_uuid "${MOUNT_PATH}/home")
-				if echo "$subvolid" | grep -Fqx "ERROR"; then
-					TASK_ERROR=1
-					TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
-					STATE="FAIL"
-					continue
-				fi
-
-				mount -t btrfs -o rootflags=subvol=${MOUNT_PATH}/home,rw -U "${home_disk_uuid}" "${SUBVOL}/home"
+				mount --bind "${MOUNT_PATH}/home" "${SUBVOL_HOME_MOUNT}"
 			elif mountpoint -q "/home"
-				mount --bind "/home" "${SUBVOL}/home"
+				mount --bind "/home" "${SUBVOL_HOME_MOUNT}"
+			else
+				TASK_WARNING=1
+				TASK_WARNING_MSG="Could not mount /home directory"
 			fi
 
 			# bind-mount /efi of the newly deployed image
-			if [ -d "${SUBVOL}/efi" ]; then
-				mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL}/efi"
+			SUBVOL_EFI_MOUNT="${SUBVOL}/efi"
+			if [ -d "${SUBVOL_EFI_MOUNT}" ]; then
+				mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL_EFI_MOUNT}"
 			else
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Could not mount ESP partition because image does not have a /efi directory"
 			fi
 
 			# Execute any migrations available in the image to be deployed
-			TASK_MSG="Executing deployment migrations"
-			local migrations_result=$(execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}")
-			if echo "${migrations_result}" | grep -Fqx "ERROR"; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Migrations on subvolume '$SUBVOL' failed: ${migrations_result}"
-				STATE="FAIL"
-				continue
-			fi
-
-			# TODO: the following code that prepare /etc and /var overlays should only be done if requested by the operating system
-			# ======================================================================================================================
-			# restore current /etc and /var overlays if possible or create new ones
-			if echo "${CURRENT}" | grep -Fqx 'ERROR'; then
+			if [ -d "${SUBVOL}"/usr/lib/frzr.d ]; then
+				TASK_MSG="Executing deployment migrations"
+				local migrations_result=$(execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}")
+				if echo "${migrations_result}" | grep -Fqx "ERROR"; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Migrations on subvolume '$SUBVOL' failed: ${migrations_result}"
+					STATE="FAIL"
+					continue
+				fi
+			else
 				TASK_WARNING=1
-				TASK_WARNING_MSG="Error fetching the current frzr deployment: ${CURRENT}"
-
-				local sysroot_subvol_creation_result=$(prepare_empty_sysroot_overlay "${SUBVOL}/sysroot")
-				if echo "${sysroot_subvol_creation_result}" | grep -Fqx "ERROR"; then
-					TASK_ERROR=1
-					TASK_ERROR_MSG="Could not create overlayfs: ${sysroot_subvol_creation_result}"
-					STATE="FAIL"
-					continue
-				fi
-			elif is_btrfs_subvolume "${DEPLOY_PATH}/${CURRENT}/sysroot"; then
-				TASK_MSG="Import current /etc and /var overlays to the new deployment..."
-        		if ! btrfs snapshot "${DEPLOY_PATH}/${CURRENT}/sysroot" "${SUBVOL}/sysroot"; then
-					TASK_ERROR=1
-					TASK_ERROR_MSG="Could not snapshot the current overlay: ${sysroot_subvol_creation_result}"
-					STATE="FAIL"
-					continue
-				fi
-			elif [ -d "${MOUNT_PATH}/etc" ] && [ -d "${MOUNT_PATH}/.etc" ]; then
-				local sysroot_subvol_creation_result=$(prepare_empty_sysroot_overlay "${SUBVOL}/sysroot")
-				if echo "${sysroot_subvol_creation_result}" | grep -Fqx "ERROR"; then
-					TASK_ERROR=1
-					TASK_ERROR_MSG="Could not create overlayfs: ${sysroot_subvol_creation_result}"
-					STATE="FAIL"
-					continue
-				fi
-
-				cp -a "${MOUNT_PATH}/etc" "${SUBVOL}/sysroot/"
-				cp -a "${MOUNT_PATH}/.etc" "${SUBVOL}/sysroot/"
-				cp -a "/var" "${SUBVOL}/sysroot/"
-
-				rmdir "${SUBVOL}/sysroot/etc_overlay/upper"
-				rmdir "${SUBVOL}/sysroot/etc_overlay/workdir"
-				rmdir "${SUBVOL}/sysroot/var_overlay/upper"
-
-				mv "${SUBVOL}/sysroot/etc" "${SUBVOL}/sysroot/etc_overlay/upper"
-				mv "${SUBVOL}/sysroot/.etc" "${SUBVOL}/sysroot/etc_overlay/workdir"
-				mv "${SUBVOL}/sysroot/var" "${SUBVOL}/sysroot/var_overlay/upper"
-			fi
-
-			local sysroot_set_rw=$(btrfs_subvolume_set_rw "${SUBVOL}/sysroot")
-			if echo "${sysroot_set_rw}" | grep -Fqx "ERROR"; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not set /sysroot subvol RW: ${sysroot_set_rw}"
-				STATE="FAIL"
-				continue
-			fi
-			# ======================================================================================================================
-
-			# umount the /home mount
-			if mountpoint -q "${SUBVOL}/home"; then
-				umount -l "${SUBVOL}/home"
-			fi
-
-			# umount the /efi bind-mount
-			if mountpoint -q "${SUBVOL}/efi"; then
-				umount -l "${SUBVOL}/efi"
+				TASK_WARNING_MSG="Could not find migrations scripts inside the deployed image"
 			fi
 
 			STATE="VERIFY"
@@ -432,7 +378,6 @@ main() {
 		"CLEANUP")
 			TASK_STATE="CLEANUP"
 			# Delete the downloaded system img etc.
-
 
 			# Get the rootfs UUID: this will be used in generating the systemd-boot entry
 			TASK_MSG="Finding deployment partition UUID"
@@ -526,33 +471,12 @@ main() {
 			# This state should only be used if the installation completed without errors
 			TASK_STATE="SUCCESS"
 
-			# umount the efi path
-			if mountpoint -q ${EFI_MOUNT_PATH}; then
-				umount -l ${EFI_MOUNT_PATH}
-			fi
-
-			# umount the frzr_root subvolume
-			if mountpoint -q ${MOUNT_PATH}; then
-				umount -l ${MOUNT_PATH}
-			fi
-
 			TASK_MSG="Deployment is successful: reboot to boot into ${NAME}"
 
 			RUNNING=false
 			;;
 		"FAIL")
 			# This state should only be used if the installation failed
-			
-			# umount the efi path
-			if mountpoint -q ${EFI_MOUNT_PATH}; then
-				umount -l ${EFI_MOUNT_PATH}
-			fi
-
-			# umount the frzr_root subvolume
-			if mountpoint -q ${MOUNT_PATH}; then
-				umount -l ${MOUNT_PATH}
-			fi
-			
 			TASK_STATE="FAIL"
 			RUNNING=false
 			;;
@@ -563,6 +487,30 @@ main() {
 			;;
 		esac
 	done
+
+	# umount the subvol /home bind-mount
+	if [ ! -z $SUBVOL_HOME_MOUNT ]; then
+		if mountpoint -q "${SUBVOL_HOME_MOUNT}"; then
+			umount -l "${SUBVOL_HOME_MOUNT}"
+		fi
+	fi
+
+	# umount the subvol /efi bind-mount
+	if [ ! -z $SUBVOL_EFI_MOUNT ]; then
+		if mountpoint -q "${SUBVOL_EFI_MOUNT}"; then
+			umount -l "${SUBVOL_EFI_MOUNT}"
+		fi
+	fi
+
+	# umount the efi path
+	if mountpoint -q ${EFI_MOUNT_PATH}; then
+		umount -l ${EFI_MOUNT_PATH}
+	fi
+
+	# umount the frzr_root subvolume
+	if mountpoint -q ${MOUNT_PATH}; then
+		umount -l ${MOUNT_PATH}
+	fi
 }
 
 # Start the main() method like this for now since the old logic doesn't work

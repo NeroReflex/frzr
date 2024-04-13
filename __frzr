@@ -326,13 +326,13 @@ check_uefi() {
 }
 
 # Check if there are migrations available in the image to be deployed and run them one by one
-# Note: migrations are functions named either post_install_ro or post_install_rw inside (executable) files with .migration extension
+# Note: migrations are functions named either post_install or chroot_post_install inside (executable) files with .migration extension
 # stored inside $2/usr/lib/frzr.d/
 #
-# WARNING: every time post_install_rw migration is encountered the following is performed:
-#    - the btrfs subvolume is set R/W
-#    - migration is executed (with the subvolume being read/write)
-#    - the btrfs subvolume is set back to RO 
+# Every post_install function will be run in a subshell, while every chroot_post_install will be run inside a chroot.
+#
+# PRE=$2/usr/lib/frzr.d is a directory
+# POST=
 #
 # $1 the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
 # $2 the deployment mounted subvolume: while migrations are run this has to be read-write
@@ -345,7 +345,30 @@ execute_migrations() {
 
 	if compgen -G "${deployment}"/usr/lib/frzr.d/*.migration >/dev/null; then
 		for m in "${deployment}"/usr/lib/frzr.d/*.migration; do
-			# TODO: use something like arch-chroot to execute commands from the final image
+			unset frzr_migration_version
+
+			unset -f post_install
+			unset -f chroot_post_install
+
+			# source the migration
+			. $m
+
+			# only execute migrations marked for newer frzr versions
+			if [ ! -z $frzr_migration_version ] && [ $frzr_migration_version -gt 0 ]; then
+				if [ "$(type -t post_install)" == function ] ; then
+					post_install "${frzr_root}" "${deployment}" "${version}"
+				fi
+
+				if [ "$(type -t chroot_post_install)" == function ] ; then
+					# TODO: use something like arch-chroot to execute commands from the final image
+					echo "TODO: use something like arch-chroot to execute commands from the final image"
+				fi
+			fi
+
+			unset -f post_install
+			unset -f chroot_post_install
+
+			unset frzr_migration_version
 		done
 	fi
 }
