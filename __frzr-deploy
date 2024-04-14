@@ -106,8 +106,6 @@ main() {
 					continue
 				fi
 
-				local deploy_systemd_boot_cfg="frzr.conf"
-
 				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path"
 
 				# Make sure the EFI partition is mounted during the deployment procedure
@@ -123,7 +121,6 @@ main() {
 
 				# Check the "EFI System" partition is actually mounted
 				if mountpoint -q ${EFI_MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
-					BOOT_CFG="${EFI_MOUNT_PATH}/loader/entries/${deploy_systemd_boot_cfg}"
 					STATE="DOWNLOAD"
 				else
 					TASK_ERROR=1
@@ -409,7 +406,7 @@ main() {
 			fi
 
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-			local efi_update_result=$(prepare_efi_partition "${NAME}" "${EFI_MOUNT_PATH}" ${SUBVOL} "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${deploy_systemd_boot_cfg}" "${rootfs_uuid}" "${rootfs_subvolid}")
+			local efi_update_result=$(prepare_efi_partition "${NAME}" "${EFI_MOUNT_PATH}" "${SUBVOL}" "${additional_arguments}" "${rootfs_uuid}" "${rootfs_subvolid}")
 			if echo "${efi_update_result}" | grep -q 'ERROR'; then
 				# bootloader configuration could not be updated
 				TASK_ERROR=1
@@ -440,7 +437,7 @@ main() {
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Could not retrieve deployment to keep: ${CURRENT}"				
 			else
-				local deployment_to_be_removed=$(get_deployment_to_delete ${CURRENT} ${BOOT_CFG} ${DEPLOY_PATH})
+				local deployment_to_be_removed=$(get_deployment_to_delete ${CURRENT} ${NAME} ${DEPLOY_PATH})
 
 				if [ ! -z ${deployment_to_be_removed} ]; then
 					# remove all sub-subvolumes of the deployment and the deployment itself (use "deployments" as grep to avoid deleting something else)

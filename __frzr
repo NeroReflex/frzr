@@ -280,26 +280,26 @@ get_img_url() {
 	echo $result
 }
 
+# Get an unused deployment that will be removed
+#
+# PRE=$3 is the directory holding deployments
+# POST=
+#
+# $1 the name of the currently running version
+# $2 the name of another bootable version to be kept (usually the version being deployed)
+# $3 the deployment path (mind not inserting a final /)
+#
+# stdout the name of a deployment to be removed, "" if none is to be removed, the error otherwise
 get_deployment_to_delete() {
 	local current_version=${1}
-	local boot_cfg_path=${2}
+	local next_version=${2}
 	local deployment_path=${3}
 
-	local TO_BOOT=$(get_next_boot_deployment ${current_version} ${boot_cfg_path})
-
-	ls -1 ${deployment_path} | grep -v ${current_version} | grep -v ${TO_BOOT} | head -1 || echo
-}
-
-get_next_boot_deployment() {
-	local current_version=${1}
-	local boot_cfg_path=${2}
-
-	local TO_BOOT='this-is-not-a-valid-version-string'
-	if [ -f "${boot_cfg_path}" ] && grep "^title" "${boot_cfg_path}" >/dev/null; then
-		TO_BOOT=$(grep ^title ${boot_cfg_path} | sed 's/title //')
+	if [ -d "${deployment_path}" ]; then
+		ls -1 "${deployment_path}" | grep -Fv "${current_version}" | grep -Fv "${next_version}" | head -1 || echo
+	else
+		echo "ERROR: ${deployment_path} is not a valid directory"
 	fi
-
-	echo ${TO_BOOT}
 }
 
 clean_progress() {
@@ -376,71 +376,77 @@ execute_migrations() {
 # Write the systemd-boot entry needed to boot the specified deployment
 # Note: this function can ignore amd-ucode and intel-ucode if those are not found since mkinitcpio will place those
 # in the initramfs and including them on systemd-boot is not deprecated.
-# $1  the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
-# $2  /efi mount path, the vfat partition (mind not inserting a final /)
-# $3  amd_ucode.img path relative to $2/$3/ (mind not inserting a final /)
-# $4  intel_ucode.img path relative to $2/$3/ (mind not inserting a final /)
-# $5  vmlinuz-linux path relative to $2/$3/ (mind not inserting a final /)
-# $6  initramfs-linux.img path relative to $2/$3/ (mind not inserting a final /)
-# $7  additional arguments to be used in the kernel cmdline
-# $8  entry config file name (mind not inserting a final /)
-# $9  the UUID of the btrfs rootfs partition containing the deployment to boot
-# $10 the btrfs subvolume ID of the deployment to boot
+# $1  the deployment version
+# $2  the config file name
+# $3  the boot entry (visible) name
+# $4  /efi mount path, the vfat partition (mind not inserting a final /)
+# $5  amd_ucode.img path relative to $2/$3/ (mind not inserting a final /)
+# $6  intel_ucode.img path relative to $2/$3/ (mind not inserting a final /)
+# $7  vmlinuz-linux path relative to $2/$3/ (mind not inserting a final /)
+# $8  initramfs-linux.img path relative to $2/$3/ (mind not inserting a final /)
+# $9  additional arguments to be used in the kernel cmdline
+# $10 the UUID of the btrfs rootfs partition containing the deployment to boot
+# $11 the btrfs subvolume ID of the deployment to boot
 # stdout the configuration to be written to a systemd-boot entry to make the given deployment version bootable
 # return "OK" for success, an error string otherwise
 generate_systemd_boot_cfg() {
 	local version=${1}
-	local efi_mount_path=${2}
-	local amd_ucode=${3}
-	local intel_ucode=${4}
-	local vmlinuz=${5}
-	local initramfs=${6}
-	local additional_arguments=${7}
-	local boot_entry=${8}
-	local btrfs_rootfs_uuid=${9}
-	local btrfs_rootfs_subvolid=${10}
+	local entry_conf_filename=${2}
+	local entry_name=${3}
+	local efi_mount_path=${4}
+	local amd_ucode=${5}
+	local intel_ucode=${6}
+	local vmlinuz=${7}
+	local initramfs=${8}
+	local additional_arguments=${9}
+	local btrfs_rootfs_uuid=${10}
+	local btrfs_rootfs_subvolid=${11}
 
-	local autoboot_entry_conf="$efi_mount_path/loader/entries/${boot_entry}"
-	local entry_conf="$efi_mount_path/loader/entries/${version}.conf"
+	local entry_conf="${efi_mount_path}/loader/entries/${entry_conf_filename}"
 
 	# search for the actual kernel to boot
 	if [ -f ${efi_mount_path}/${version}/${vmlinuz} ]; then
 		# search fot the initramfs
 		if [ -f ${efi_mount_path}/${version}/${initramfs} ]; then
 			# write title chimeraos-46_fcc653a3 (also creating the boot entry file if it doesn't exists yet)
-			echo "title ${version}" | tee ${entry_conf} >/dev/null
-			echo "title ${version} (latest)" | tee ${autoboot_entry_conf} >/dev/null
+			echo "title ${entry_name}" > "${entry_conf}"
 
 			# write linux /chimeraos-46_fcc653a3/vmlinuz-linux
-			echo "linux /${version}/${vmlinuz}" | tee --append ${entry_conf} >/dev/null
-			echo "linux /${version}/${vmlinuz}" | tee --append ${autoboot_entry_conf} >/dev/null
+			echo "linux /${version}/${vmlinuz}" > "${entry_conf}"
 
 			# write /chimeraos-46_fcc653a3/amd-ucode.img if necessary
 			if [ -f ${efi_mount_path}/${version}/${amd_ucode} ]; then
-				echo "initrd /${version}/${amd_ucode}" | tee --append ${entry_conf} >/dev/null
-				echo "initrd /${version}/${amd_ucode}" | tee --append ${autoboot_entry_conf} >/dev/null
+				echo "initrd /${version}/${amd_ucode}" > "${entry_conf}"
 			else
-				echo "# amd-ucode.img omitted" | tee --append ${entry_conf} >/dev/null
-				echo "# amd-ucode.img omitted" | tee --append ${autoboot_entry_conf} >/dev/null
+				echo "# amd-ucode.img omitted" > "${entry_conf}"
 			fi
 
 			# write /chimeraos-46_fcc653a3/intel-ucode.img if necessary
 			if [ -f ${efi_mount_path}/${version}/${intel_ucode} ]; then
-				echo "initrd /${version}/${intel_ucode}" | tee --append ${entry_conf} >/dev/null
-				echo "initrd /${version}/${intel_ucode}" | tee --append ${autoboot_entry_conf} >/dev/null
+				echo "initrd /${version}/${intel_ucode}" > "${entry_conf}"
 			else
-				echo "# intel-ucode.img omitted" | tee --append ${entry_conf} >/dev/null
-				echo "# intel-ucode.img omitted" | tee --append ${autoboot_entry_conf} >/dev/null
+				echo "# intel-ucode.img omitted" > "${entry_conf}"
 			fi
 
 			# write /chimeraos-46_fcc653a3/initrams-linuz.img
-			echo "initrd /${version}/${initramfs}" | tee --append ${entry_conf} >/dev/null
-			echo "initrd /${version}/${initramfs}" | tee --append ${autoboot_entry_conf} >/dev/null
+			echo "initrd /${version}/${initramfs}" > "${entry_conf}"
+
+			local options=""
+			if [ ! -z "${btrfs_rootfs_uuid}" ];
+				options="${options} root=UUID=${btrfs_rootfs_uuid}"
+			else
+				options="${options} root=gpt-auto"
+			fi
+
+			if [ ! -z "${btrfs_rootfs_subvolid}" ];
+				options="${options} rootflags=subvolid=${btrfs_rootfs_subvolid},rw"
+			else
+				options="${options} rw"
+			fi
 
 			# write kernel cmdline
-			echo "options root=UUID=${btrfs_rootfs_uuid} rootflags=subvolid=${btrfs_rootfs_subvolid},rw rw quiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 ${additional_arguments}" | tee --append ${entry_conf} >/dev/null
-			echo "options root=gpt-auto rw quiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 ${additional_arguments}" | tee --append ${autoboot_entry_conf} >/dev/null
-
+			echo "options ${options} quiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 ${additional_arguments}" > "${entry_conf}"
+			
 			# return success
 			echo "OK"
 		else
@@ -461,117 +467,79 @@ generate_systemd_boot_cfg() {
 # $1  the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
 # $2  /efi mount path
 # $3  the path to the deployment to be booted
-# $4  amd_ucode.img path relative to $2/$3/ (mind not inserting a final /)
-# $5  intel_ucode.img path relative to $2/$3/ (mind not inserting a final /)
-# $6  vmlinuz-linux path relative to $2/$3/ (mind not inserting a final /)
-# $7  initramfs-linux.img path relative to $2/$3/ (mind not inserting a final /)
-# $8  additional arguments to be used in the kernel cmdline
-# $9  entry config file name (mind not inserting a final /)
-# $10 the UUID of the btrfs rootfs partition containing the deployment to boot
-# $11 the btrfs subvolume ID of the deployment to boot
+# $4  additional arguments to be used in the kernel cmdline
+# $5 the UUID of the btrfs rootfs partition containing the deployment to boot
+# $6 the btrfs subvolume ID of the deployment to boot
 # stdout "OK" for success, and error string otherwise
 prepare_efi_partition() {
 	local version=${1}
 	local efi_mount_path=${2}
 	local boot_dir=${3}
-	local amd_ucode=${4}
-	local intel_ucode=${5}
-	local vmlinuz_name=${6}
-	local initramfs_name=${7}
-	local additional_arguments=${8}
-	local boot_entry=${9}
-	local btrfs_rootfs_uuid=${10}
-	local btrfs_rootfs_subvolid=${11}
+	local additional_arguments=${4}
+	local btrfs_rootfs_uuid=${5}
+	local btrfs_rootfs_subvolid=${6}
+
+	local default_config_entry=""
 
 	# create /loader/entries in the EFI system partition (if it does not exists already)
 	mkdir -p ${efi_mount_path}/loader/entries
 
+	# this will hold the default .conf file
+	local default_boot_cfg=""
+
 	if [ -d "${efi_mount_path}/loader/entries" ]; then
-		if [ -f ${boot_dir}/${vmlinuz_name} ]; then
-			if [ -f ${boot_dir}/${initramfs_name} ]; then
-				# each deployment will need its own kernel as well as initramfs to boot: place them in a EFI subdirectory
+		# Iterate over each pair of files
+		for vmlinuz_file_path in ${boot_dir}/vmlinuz-*.img; do
+			# Extract the matching part of the filename and remove the .img extension
+			kernel_version=$(basename "${vmlinuz_file_path}" | sed 's/^vmlinuz-//')
+
+			# $initramfs_file is the initramfs name of the file in /boot: find the corresponding vmlinuz file
+			initramfs_file="initramfs-${kernel_version}.img"
+			
+			# $vmlinuz_file is the kernel name of the file in /boot: find the corresponding initramfs file
+			vmlinuz_file="vmlinuz-${kernel_version}"
+			
+			# Check if the corresponding vmlinuz file exists
+			if [ -f "${vmlinuz_file}" ] && [ -f "${initramfs_file}" ]; then
+				# each deployment will need its own kernel(s) as well as initramfs to boot: place them in a EFI subdirectory
 				mkdir -p ${efi_mount_path}/${version}
 
-				if [ -d "${efi_mount_path}/${version}" ]; then
-					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "systemd"; then
-						echo "systemd hook has boon found"
-					else
-						echo '
-						# TODO: see https://wiki.archlinux.org/title/Mkinitcpio
-						# TODO: use sed to add systemd hooks replacing udev, usr and resume, and sd-vconsole replacing consolefont and keymap
-						# TODO: use the image mkinitcpio to regenerate the initramfs
-						# TODO: see https://wiki.archlinux.org/title/Mkinitcpio
-						# TODO: use sed to add systemd hooks replacing udev, usr and resume, and sd-vconsole replacing consolefont and keymap
-						# TODO: use the image mkinitcpio to regenerate the initramfs
-						'
-					fi
+				local amd_ucode="amd-ucode.img"
+				if [ -e "${boot_dir}/amd-ucode.img" ]; then
+					cp "${boot_dir}/amd-ucode.img" "${efi_mount_path}/${version}/${amd_ucode}"
+				fi
 
-					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "microcode"; then
-						echo "ucode hook has been found"
-					else
-						local amd_ucode="amd-ucode.img"
-						if [ -e ${boot_dir}/amd-ucode.img ]; then
-							cp ${boot_dir}/amd-ucode.img ${efi_mount_path}/${version}/${amd_ucode}
+				local intel_ucode="intel-ucode.img"
+				if [ -e "${boot_dir}/intel-ucode.img" ]; then
+					cp "${boot_dir}/intel-ucode.img" "${efi_mount_path}/${version}/${intel_ucode}"
+				fi
+
+				if cp "${boot_dir}/${vmlinuz_file}" "${efi_mount_path}/${version}/${vmlinuz_file}"; then
+					if cp "${boot_dir}/${initramfs_file}" "${efi_mount_path}/${version}/${initramfs_file}"; then
+						local boot_entry="frzr-${version}-${kernel_version}.conf"
+						default_boot_cfg="${boot_entry}"
+
+						# Write the configuration entry
+						local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${boot_entry}" "${version} (${kernel_version})" "${efi_mount_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_file}" "${initramfs_file}" "${additional_arguments}" "${btrfs_rootfs_uuid}" "${btrfs_rootfs_subvolid}")
+						if echo "${systemd_boot_update_result}" | grep -q 'ERROR'; then
+							echo "ERROR: Could not add bootloader entry: ${systemd_boot_update_result}"
 						fi
-					fi
-
-					if [ -f "$SUBVOL/etc/mkinitcpio" ] && cat "$SUBVOL/etc/mkinitcpio" | grep "HOOKS" | grep -Fqx "microcode"; then
-						echo "ucode hook has been found"
 					else
-						local intel_ucode="intel-ucode.img"
-						if [ -e ${boot_dir}/intel-ucode.img ]; then
-							cp ${boot_dir}/intel-ucode.img ${efi_mount_path}/${version}/${intel_ucode}
-						fi
-					fi
-
-					# Following steps copy kernel, initramfs and ucode to the EFI partition to be used on the next boot
-					cp ${boot_dir}/${vmlinuz_name} ${efi_mount_path}/${version}/${vmlinuz_name}
-					cp ${boot_dir}/${initramfs_name} ${efi_mount_path}/${version}/${initramfs_name}
-
-					local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${efi_mount_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_name}" "${initramfs_name}" "${additional_arguments}" "${boot_entry}" "${btrfs_rootfs_uuid}" "${btrfs_rootfs_subvolid}")
-					echo "systemd-boot install: ${systemd_boot_update_result}"
-
-					if echo "${systemd_boot_update_result}" | grep -q 'OK'; then
-						echo "default ${boot_entry}" >${efi_mount_path}/loader/loader.conf
-
-						echo "OK"
-					else
-						echo "${systemd_boot_update_result}"
+						echo "ERROR: Could not copy '${boot_dir}/${initramfs_file}' to '${efi_mount_path}/${version}/${initramfs_file}'"
 					fi
 				else
-					echo "ERROR: could not create path '${efi_mount_path}/${version}' system will not be bootable"
+					echo "ERROR: Could not copy '${boot_dir}/${vmlinuz_file}' to '${efi_mount_path}/${version}/${vmlinuz_file}'"
 				fi
-			else
-				# searched at should be mount/deployment/chimeraos_XX-YYYYYY/boot/initramfs-linux.img
-				echo "ERROR: Could not find initramfs (searched at: '$deployment_root/boot/$initramfs_name')"
 			fi
-		else
-			# searched at should be mount/deployment/chimeraos_XX-YYYYYY/boot/vmlinuz-linux
-			echo "ERROR: Could not find vmlinuz (searched at: '$deployment_root/boot/$vmlinuz_name')"
-		fi
-	else
-		echo "ERROR: could not create path '${efi_mount_path}/loader/entries' system will not be bootable"
-	fi
-}
+		done
 
-# Prepare an empty overlay that can host every modification made to a deployment
-# PRE=deployment_subvol is an unmodified deployment
-# POST=deployment_subvol can be overlayed at the next boot
-# $1 the path to the (R/W) deployment to be overlayed
-# stdout "OK" for success, and error string otherwise
-prepare_empty_sysroot_overlay() {
-	local deployment_subvol=${1}
+		# TODO: check for kernel override
 
-	if btrfs subvolume create "${deployment_subvol}/sysroot"; then
-		if is_btrfs_subvolume "${deployment_subvol}/sysroot"; then
-			mkdir -p "${deployment_subvol}/sysroot/etc_overlay/upper"
-			mkdir -p "${deployment_subvol}/sysroot/etc_overlay/workdir"
-			mkdir -p "${deployment_subvol}/sysroot/var_overlay/upper"
-			mkdir -p "${deployment_subvol}/sysroot/var_overlay/workdir"
+		# write the default boot entry
+		if [ -z $default_boot_cfg ]; then
+			echo "ERROR: no bootable kernel found"
 		else
-			echo "ERROR: Creation of subvolume '${deployment_subvol}/sysroot' silently failed"
+			echo "default ${default_boot_cfg}" > ${efi_mount_path}/loader/loader.conf
 		fi
-	else
-		echo "ERROR: Could not create '${deployment_subvol}/sysroot' subvolume"
 	fi
 }
