@@ -265,7 +265,7 @@ main() {
 
 			# Install the deployment from the downloaded file $IMG_FILE and place the deployed image in $DEPLOY_PATH
 			local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
-			if echo "${install_result}" | grep -q 'ERROR'; then
+			if echo "${install_result}" | grep -Fqx 'ERROR'; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Error extracting the deployment image: ${install_result}"
 				STATE="FAIL"
@@ -281,7 +281,7 @@ main() {
 				local SUBVOL_HOME_MOUNT="${SUBVOL}/home"
 				if is_btrfs_subvolume "${MOUNT_PATH}/home"; then
 					mount --bind "${MOUNT_PATH}/home" "${SUBVOL_HOME_MOUNT}"
-				elif mountpoint -q "/home"
+				elif mountpoint -q "/home"; then
 					mount --bind "/home" "${SUBVOL_HOME_MOUNT}"
 				else
 					TASK_WARNING=1
@@ -431,7 +431,7 @@ main() {
 				fi
 
 				# Delete deployment entries
-				for entry_path in ${EFI_MOUNT_PATH}/loader/entries/${NAME}*.conf do
+				for entry_path in ${EFI_MOUNT_PATH}/loader/entries/${NAME}*.conf; do
 					TASK_MSG="deleting deployment boot entry '${entry_path}'"
 					rm -rf "${entry_path}"
 				done

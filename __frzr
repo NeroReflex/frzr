@@ -459,13 +459,13 @@ generate_systemd_boot_cfg() {
 			echo "initrd /${version}/${initramfs}" > "${entry_conf}"
 
 			local options=""
-			if [ ! -z "${btrfs_rootfs_uuid}" ];
+			if [ ! -z "${btrfs_rootfs_uuid}" ]; then
 				options="${options} root=UUID=${btrfs_rootfs_uuid}"
 			else
 				options="${options} root=gpt-auto"
 			fi
 
-			if [ ! -z "${btrfs_rootfs_subvolid}" ];
+			if [ ! -z "${btrfs_rootfs_subvolid}" ]; then
 				options="${options} rootflags=subvolid=${btrfs_rootfs_subvolid},rw"
 			else
 				options="${options} rw"
