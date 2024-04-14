@@ -94,16 +94,16 @@ fresh_install() {
 
 	mkdir -p ${frzr_root}
 
-	if [ -z ${SWAP_GIB:-} ]; then
+	if [ -z "${SWAP_GIB:-}" ]; then
 		declare -i SWAP_GIB=2 # A 2GiB swap will prevent some games crashing on 16GB handhelds
 	fi
 
-	if [ -z ${ROOT_GIB:-} ]; then
+	if [ -z "${ROOT_GIB:-}" ]; then
 		declare -i ROOT_GIB=0
 	fi
 
 	# $SEPARATE_HOME_FS can be either btrfs or ext4
-	if [ -z ${SEPARATE_HOME_FS:-} ]; then
+	if [ -z "${SEPARATE_HOME_FS:-}" ]; then
 		SEPARATE_HOME_FS="ext4"
 	fi
 

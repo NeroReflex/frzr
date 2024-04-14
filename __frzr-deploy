@@ -249,10 +249,12 @@ main() {
 			# This step might not ever need to be used, but left here depending on the occasion it may be needed.
 
 			# Write the deployment image to disk (if it was not being done already by the download step)
-			if is_btrfs_subvolume "$SUBVOL"; then
-				# skip this step: the subvolume has been created already
-				STATE="INSTALL"
-				continue
+			if [ -d "$SUBVOL" ]; then
+				if is_btrfs_subvolume "$SUBVOL"; then
+					# skip this step: the subvolume has been created already
+					STATE="INSTALL"
+					continue
+				fi
 			fi
 
 			# Use BTRFS receive to install the image

@@ -16,7 +16,7 @@ get_uuid() {
 		local possible_uuid=$(lsblk -n -o UUID "${subcmd}")
 		local filtered_uuid=$(echo "${possible_uuid}" | grep -E '[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}')
 
-		if [ -z $filtered_uuid ]; then
+		if [ -z "$filtered_uuid" ]; then
 			echo "ERROR: Cannot fetch the UUID for directory '${dir}'"
 		else
 			echo "${filtered_uuid}"
@@ -56,7 +56,7 @@ btrfs_filtered_subvolume_recursive_delete() {
 
 	local error=""
 
-	if [-d "${dir}" ]; then
+	if [ -d "${dir}" ]; then
 		if is_btrfs_subvolume "${dir}"; then
 			local set_rw_res=$(btrfs_subvolume_set_rw "${subvol_path}")
 			if echo "${set_rw_res}" | grep -Fqx "ERROR"; then
@@ -64,14 +64,14 @@ btrfs_filtered_subvolume_recursive_delete() {
 			else
 				btrfs subvolume list --sort=-path "${dir}" | grep "${expr}" | cut -d ' ' -f 9 | \
 				while read subvol_path; do
-					if [ -z $error ]; then
+					if [ -z "$error" ]; then
 						if ! btrfs subvolume delete "${subvol_path}"; then
 							error="ERROR: Could not delete subvolume '${subvol_path}'"
 						fi
 					fi
 				done
 
-				if [ -z $error ]; then
+				if [ -z "$error" ]; then
 					echo "OK"
 				else
 					echo "${error}"
@@ -563,10 +563,12 @@ prepare_efi_partition() {
 		# TODO: check for kernel override
 
 		# write the default boot entry
-		if [ -z $default_boot_cfg ]; then
+		if [ -z "$default_boot_cfg" ]; then
 			echo "ERROR: no bootable kernel found"
 		else
 			echo "default ${default_boot_cfg}" > ${efi_mount_path}/loader/loader.conf
+
+			echo "OK"
 		fi
 	fi
 }
