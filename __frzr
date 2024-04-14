@@ -54,14 +54,24 @@ btrfs_filtered_subvolume_recursive_delete() {
 	local dir=${1}
 	local expr=${2}
 
+	local error=""
+
 	if [-d "${dir}" ]; then
 		if is_btrfs_subvolume "${dir}"; then
 			btrfs subvolume list --sort=-path "${dir}" | grep "${expr}" | cut -d ' ' -f 9 | \
 			while read subvol_path; do
-				btrfs subvolume delete "${subvol_path}"
+				if [ -z $error ]; then
+					if ! btrfs subvolume delete "${subvol_path}"; then
+						error="ERROR: Could not delete subvolume '${subvol_path}'"
+					fi
+				fi
 			done
 
-			echo "OK"
+			if [ -z $error ]; then
+				echo "OK"
+			else
+				echo "${error}"
+			fi
 		else
 			echo "ERROR: Directory '${dir}' is not a valid btrfs subvolume"
 		fi
@@ -81,13 +91,15 @@ btrfs_subvolume_set_rw() {
 	if is_btrfs_subvolume "$dir"; then
 		local lock_state=$(btrfs property get -fts "$dir")
 		if [[ $lock_state == *"ro=true"* ]]; then
-			btrfs property set -fts ${dir} ro false
-
-			local lock_state_after_set=$(btrfs property get -fts "$dir")
-			if [[ $lock_state_after_set == *"ro=false"* ]]; then
-				echo "OK"
+			if btrfs property set -fts ${dir} ro false; then
+				local lock_state_after_set=$(btrfs property get -fts "$dir")
+				if [[ $lock_state_after_set == *"ro=false"* ]]; then
+					echo "OK"
+				else
+					echo "ERROR: The subvolume '$dir' is still read-only"
+				fi
 			else
-				echo "ERROR: the subvolume '$dir' is still readonly"
+				echo "ERROR: Could not set subvolume '$dir' read-write"
 			fi
 		else
 			echo "OK"
@@ -98,8 +110,10 @@ btrfs_subvolume_set_rw() {
 }
 
 # Ensure the subvolume is in RO state
-# PRE=
+#
+# PRE=the directory is a btrfs subvolume
 # POST=the directory is a btrfs subvolume in RO state
+#
 # $1 the subvolume to be changed
 # stdout "OK" on success, an error string otherwise
 btrfs_subvolume_set_ro() {
@@ -108,13 +122,15 @@ btrfs_subvolume_set_ro() {
 	if is_btrfs_subvolume "$dir"; then
 		local lock_state=$(btrfs property get -fts "$dir")
 		if [[ $lock_state == *"ro=false"* ]]; then
-			btrfs property set -fts ${dir} ro true
-
-			local lock_state_after_set=$(btrfs property get -fts "$dir")
-			if [[ $lock_state_after_set == *"ro=true"* ]]; then
-				echo "OK"
+			if btrfs property set -fts ${dir} ro true; then
+				local lock_state_after_set=$(btrfs property get -fts "$dir")
+				if [[ $lock_state_after_set == *"ro=true"* ]]; then
+					echo "OK"
+				else
+					echo "ERROR: The subvolume '$dir' is still read-write"
+				fi
 			else
-				echo "ERROR: the subvolume '$dir' is still readonly"
+				echo "ERROR: Could not set subvolume '$dir' read-only"
 			fi
 		else
 			echo "OK"
@@ -124,10 +140,12 @@ btrfs_subvolume_set_ro() {
 	fi
 }
 
-# Ensure the subvolume is in RO state
-# PRE=
+# Get the btrfs subvolume id of the given subvolume path
+#
+# PRE=$1 is a btrfs subvolume
 # POST=
-# $1 the subvolume to be changed
+#
+# $1 the subvolume to be inspected
 # stdout SubvolID on success, an error string otherwise
 btrfs_subvol_get_id() {
 	local dir=${1}
@@ -142,6 +160,10 @@ btrfs_subvol_get_id() {
 }
 
 # Install the provided image file into the given deployment directory
+#
+# PRE=
+# POST=
+#
 # $1 The path to the image file
 # $2 The path to the deployment directory
 # stdout "OK" on success, an error otherwise
@@ -405,9 +427,9 @@ generate_systemd_boot_cfg() {
 	local entry_conf="${efi_mount_path}/loader/entries/${entry_conf_filename}"
 
 	# search for the actual kernel to boot
-	if [ -f ${efi_mount_path}/${version}/${vmlinuz} ]; then
+	if [ -f "${efi_mount_path}/${version}/${vmlinuz}" ]; then
 		# search fot the initramfs
-		if [ -f ${efi_mount_path}/${version}/${initramfs} ]; then
+		if [ -f "${efi_mount_path}/${version}/${initramfs}" ]; then
 			# write title chimeraos-46_fcc653a3 (also creating the boot entry file if it doesn't exists yet)
 			echo "title ${entry_name}" > "${entry_conf}"
 

@@ -1,7 +1,5 @@
 #! /bin/bash
 
-# TODO: when the refactor is ready these won't be necessary, and will prevent proper output.
-set -e
 set -o pipefail
 
 # import methods
@@ -78,25 +76,25 @@ main() {
 
 			CURRENT=$(frzr-release)
 
-			MOUNT_PATH=/tmp/frzr_root
+			MOUNT_PATH="/tmp/frzr_root"
 
 			# Make sure the frzr_root is mounted during the deployment procedure
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
-			if ! mountpoint -q ${MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
+			if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
 				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				mkdir -p ${MOUNT_PATH}
-				mount -L frzr_root -t btrfs -o subvolid=5 ${MOUNT_PATH}
+				mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"
 				sleep 5
 			fi
 
-			if mountpoint -q ${MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
-				DEPLOY_PATH=${MOUNT_PATH}/deployments
+			if mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
+				DEPLOY_PATH="${MOUNT_PATH}/deployments"
 
 				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path"
 
-				mkdir -p ${DEPLOY_PATH}
+				mkdir -p "${DEPLOY_PATH}"
 
 				# Make sure DEPLOY_PATH exists
 				if [ ! -d "${DEPLOY_PATH}" ]; then
@@ -113,14 +111,14 @@ main() {
 
 				TASK_MSG="Preparing '${EFI_MOUNT_PATH}' to be used as the EFI System path"
 
-				if ! mountpoint -q ${EFI_MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
-					mkdir -p ${EFI_MOUNT_PATH}
-					mount -L frzr_efi ${EFI_MOUNT_PATH}
+				if ! mountpoint -q "${EFI_MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
+					mkdir -p "${EFI_MOUNT_PATH}"
+					mount -L frzr_efi "${EFI_MOUNT_PATH}"
 					sleep 5
 				fi
 
 				# Check the "EFI System" partition is actually mounted
-				if mountpoint -q ${EFI_MOUNT_PATH} && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
+				if mountpoint -q "${EFI_MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
 					STATE="DOWNLOAD"
 				else
 					TASK_ERROR=1
@@ -193,7 +191,6 @@ main() {
 				IMG_FILE="${MOUNT_PATH}/${FILE_NAME}"
 
 				if [ -e ${SUBVOL} ]; then
-
 					# Only allow deleting the subvolume if we are booted in the installer.
 					if [ "$UPGRADE" -eq 0 ]; then
 						MSG="${NAME} is already installed, would you like to delete this and re-deploy?"
@@ -266,6 +263,7 @@ main() {
 				whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
 			fi
 
+			# Install the deployment from the downloaded file $IMG_FILE and place the deployed image in $DEPLOY_PATH
 			local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
 			if echo "${install_result}" | grep -q 'ERROR'; then
 				TASK_ERROR=1
@@ -278,56 +276,28 @@ main() {
 		"INSTALL")
 			TASK_STATE="INSTALL"
 
-			if [ -f "${SUBVOL}/etc/frzr-manifest" ]; then
-				source "${SUBVOL}/etc/frzr-manifest"
-			else
-				TASK_WARNING=1
-				TASK_WARNING_MSG="No /etc/frzr-manifest found in the deployment. Default options will be used."
-			fi
-			
-			local kernel_name="linux"
-			if [ -z $FRZR_DEPLOYMENT_KERNEL_NAME ]; then
-				TASK_WARNING=1
-				TASK_WARNING_MSG="No kernel name specified: '${kernel_name}' will be used as the defult"
-			else
-				kernel_name=$(echo "${FRZR_DEPLOYMENT_KERNEL_NAME}")
-			fi
-
-			local vmlinuz_name="vmlinuz-${kernel_name}"
-			local initramfs_name="initramfs-${kernel_name}.img"
-
-			local deployment_set_rw_result=$(btrfs_subvolume_set_rw "$SUBVOL")
-			if echo "${deployment_set_rw_result}" | grep -Fqx "ERROR"; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not set subvolume '$SUBVOL' R/W: ${deployment_set_rw_result}"
-				STATE="FAIL"
-				continue
-			else
-				# With the filesystem unlocked create standard directories systemd can automount partitions to
-				mkdir -p "${SUBVOL}/efi"
-				mkdir -p "${SUBVOL}/home"
-				mkdir -p "${SUBVOL}/srv"
-				mkdir -p "${SUBVOL}/var"
-			fi 
-
 			# mount home into the new deployment
-			SUBVOL_HOME_MOUNT="${SUBVOL}/home"
-			if is_btrfs_subvolume "${MOUNT_PATH}/home"; then
-				mount --bind "${MOUNT_PATH}/home" "${SUBVOL_HOME_MOUNT}"
-			elif mountpoint -q "/home"
-				mount --bind "/home" "${SUBVOL_HOME_MOUNT}"
-			else
-				TASK_WARNING=1
-				TASK_WARNING_MSG="Could not mount /home directory"
+			if [ -d "${SUBVOL}/home" ]; then
+				local SUBVOL_HOME_MOUNT="${SUBVOL}/home"
+				if is_btrfs_subvolume "${MOUNT_PATH}/home"; then
+					mount --bind "${MOUNT_PATH}/home" "${SUBVOL_HOME_MOUNT}"
+				elif mountpoint -q "/home"
+					mount --bind "/home" "${SUBVOL_HOME_MOUNT}"
+				else
+					TASK_WARNING=1
+					TASK_WARNING_MSG="Could not mount /home directory"
+				fi
 			fi
 
 			# bind-mount /efi of the newly deployed image
-			SUBVOL_EFI_MOUNT="${SUBVOL}/efi"
-			if [ -d "${SUBVOL_EFI_MOUNT}" ]; then
-				mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL_EFI_MOUNT}"
-			else
-				TASK_WARNING=1
-				TASK_WARNING_MSG="Could not mount ESP partition because image does not have a /efi directory"
+			if [ -d "${SUBVOL}/efi" ]; then
+				local SUBVOL_EFI_MOUNT="${SUBVOL}/efi"
+				if [ -d "${SUBVOL_EFI_MOUNT}" ]; then
+					mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL_EFI_MOUNT}"
+				else
+					TASK_WARNING=1
+					TASK_WARNING_MSG="Could not mount ESP partition because image does not have a /efi directory"
+				fi
 			fi
 
 			# Execute any migrations available in the image to be deployed
@@ -433,33 +403,38 @@ main() {
 			# - we are currently running inside a frzr deployment (i.e. not during install)
 			# - the deployment is not currently running
 			# - the deployment is not configured to be run on next boot
+			local current_deployment="this_is_not_a_valid_deployment"
 			if echo "${CURRENT}" | grep -Fqx 'ERROR'; then
 				TASK_WARNING=1
-				TASK_WARNING_MSG="Could not retrieve deployment to keep: ${CURRENT}"				
+				TASK_WARNING_MSG="Could not retrieve deployment to keep: ${CURRENT}"
 			else
-				local deployment_to_be_removed=$(get_deployment_to_delete ${CURRENT} ${NAME} ${DEPLOY_PATH})
+				current_deployment="${CURRENT}"
+			fi
 
-				if [ ! -z ${deployment_to_be_removed} ]; then
-					# remove all sub-subvolumes of the deployment and the deployment itself (use "deployments" as grep to avoid deleting something else)
-					TASK_MSG="deleting deployment ${deployment_to_be_removed}"
-					local deployment_removal_result=$(btrfs_filtered_subvolume_recursive_delete "${DEPLOY_PATH}/${deployment_to_be_removed}" "deployments")
-					if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
-						TASK_ERROR=1
-						TASK_ERROR_MSG="Could not delete the new deployment, however the new one will still boot"
-						STATE="SUCCESS"
-						continue
-					fi
-
-					if [ -f "${EFI_MOUNT_PATH}/${deployment_to_be_removed}" ]; then
-						TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${deployment_to_be_removed}'"
-						rm -rf "${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
-					fi
-					
-					if [ -f "${EFI_MOUNT_PATH}/loader/entries/${NAME}.conf" ]; then
-						TASK_MSG="deleting deployment boot entry '${EFI_MOUNT_PATH}/loader/entries/${NAME}.conf'"
-						rm -rf "${EFI_MOUNT_PATH}/loader/entries/${NAME}.conf"
-					fi
+			# delete an old deployment if there is one
+			local deployment_to_be_removed=$(get_deployment_to_delete ${current_deployment} ${NAME} ${DEPLOY_PATH})
+			if [ ! -z ${deployment_to_be_removed} ]; then
+				# Remove all sub-subvolumes of the deployment and the deployment itself (use "deployments" as grep to avoid deleting something else)
+				TASK_MSG="deleting deployment ${deployment_to_be_removed}"
+				local deployment_removal_result=$(btrfs_filtered_subvolume_recursive_delete "${DEPLOY_PATH}/${deployment_to_be_removed}" "deployments")
+				if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not delete the old deployment '${deployment_to_be_removed}', however the new one '${NAME}' will still boot"
+					STATE="SUCCESS"
+					continue
 				fi
+
+				# Delete deployment boot files taking up space in /efi 
+				if [ -f "${EFI_MOUNT_PATH}/${deployment_to_be_removed}" ]; then
+					TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${deployment_to_be_removed}'"
+					rm -rf "${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
+				fi
+
+				# Delete deployment entries
+				for entry_path in ${EFI_MOUNT_PATH}/loader/entries/${NAME}*.conf do
+					TASK_MSG="deleting deployment boot entry '${entry_path}'"
+					rm -rf "${entry_path}"
+				done
 			fi
 
 			STATE="SUCCESS"
@@ -474,6 +449,15 @@ main() {
 			;;
 		"FAIL")
 			# This state should only be used if the installation failed
+
+			if is_btrfs_subvolume "${SUBVOL}"; then
+				local deployment_removal_result=$(btrfs_filtered_subvolume_recursive_delete "${SUBVOL}" "deployments")
+				if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not delete the new (errored) deployment: ${deployment_removal_result}"
+				fi
+			fi
+
 			TASK_STATE="FAIL"
 			RUNNING=false
 			;;
