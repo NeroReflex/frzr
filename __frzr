@@ -58,19 +58,24 @@ btrfs_filtered_subvolume_recursive_delete() {
 
 	if [-d "${dir}" ]; then
 		if is_btrfs_subvolume "${dir}"; then
-			btrfs subvolume list --sort=-path "${dir}" | grep "${expr}" | cut -d ' ' -f 9 | \
-			while read subvol_path; do
-				if [ -z $error ]; then
-					if ! btrfs subvolume delete "${subvol_path}"; then
-						error="ERROR: Could not delete subvolume '${subvol_path}'"
-					fi
-				fi
-			done
-
-			if [ -z $error ]; then
-				echo "OK"
+			local set_rw_res=$(btrfs_subvolume_set_rw "${subvol_path}")
+			if echo "${set_rw_res}" | grep -Fqx "ERROR"; then
+				echo "ERROR: Could not set subvolume '"${dir}"' read-write: ${set_rw_res}"
 			else
-				echo "${error}"
+				btrfs subvolume list --sort=-path "${dir}" | grep "${expr}" | cut -d ' ' -f 9 | \
+				while read subvol_path; do
+					if [ -z $error ]; then
+						if ! btrfs subvolume delete "${subvol_path}"; then
+							error="ERROR: Could not delete subvolume '${subvol_path}'"
+						fi
+					fi
+				done
+
+				if [ -z $error ]; then
+					echo "OK"
+				else
+					echo "${error}"
+				fi
 			fi
 		else
 			echo "ERROR: Directory '${dir}' is not a valid btrfs subvolume"
