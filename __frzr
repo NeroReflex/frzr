@@ -526,8 +526,10 @@ prepare_efi_partition() {
 			# $vmlinuz_file is the kernel name of the file in /boot: find the corresponding initramfs file
 			vmlinuz_file="vmlinuz-${kernel_version}"
 			
+			echo "Checking for ${boot_dir}/${vmlinuz_file} and ${boot_dir}/${initramfs_file} " >&2
+
 			# Check if the corresponding vmlinuz file exists
-			if [ -f "${vmlinuz_file}" ] && [ -f "${initramfs_file}" ]; then
+			if [ -f "${boot_dir}/${vmlinuz_file}" ] && [ -f "${boot_dir}/${initramfs_file}" ]; then
 				# each deployment will need its own kernel(s) as well as initramfs to boot: place them in a EFI subdirectory
 				mkdir -p ${efi_mount_path}/${version}
 
