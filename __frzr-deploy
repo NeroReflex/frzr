@@ -426,15 +426,20 @@ main() {
 
 			# delete an old deployment if there is one
 			local deployment_to_be_removed=$(get_deployment_to_delete ${current_deployment} ${NAME} ${DEPLOY_PATH})
-			if [ ! -z ${deployment_to_be_removed} ]; then
+			if [ ! -z "${deployment_to_be_removed}" ]; then
 				# Remove all sub-subvolumes of the deployment and the deployment itself (use "deployments" as grep to avoid deleting something else)
-				TASK_MSG="deleting deployment ${deployment_to_be_removed}"
-				local deployment_removal_result=$(btrfs_filtered_subvolume_recursive_delete "${DEPLOY_PATH}/${deployment_to_be_removed}" "deployments")
-				if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
-					TASK_ERROR=1
-					TASK_ERROR_MSG="Could not delete the old deployment '${deployment_to_be_removed}', however the new one '${NAME}' will still boot"
-					STATE="SUCCESS"
-					continue
+				if [ -d "${DEPLOY_PATH}/${deployment_to_be_removed}" ]; then
+					TASK_MSG="deleting deployment ${deployment_to_be_removed}"
+					local deployment_removal_result=$(btrfs_filtered_subvolume_recursive_delete "${DEPLOY_PATH}/${deployment_to_be_removed}" "deployments")
+					if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
+						TASK_ERROR=1
+						TASK_ERROR_MSG="Could not delete the old deployment '${deployment_to_be_removed}', however the new one '${NAME}' will still boot"
+						STATE="SUCCESS"
+						continue
+					fi
+				else
+					TASK_WARNING=1
+					TASK_WARNING_MSG="Could not find deployment to delete '${deployment_to_be_removed}': searched '${DEPLOY_PATH}/${deployment_to_be_removed}'"
 				fi
 
 				# Delete deployment boot files taking up space in /efi 
@@ -444,9 +449,11 @@ main() {
 				fi
 
 				# Delete deployment entries (this code is based on the fact that names of entries are generated as they are in prepare_efi_partition)
-				for entry_path in "${EFI_MOUNT_PATH}"/loader/entries/frzr-$NAME-*.conf; do
-					TASK_MSG="deleting deployment boot entry '${entry_path}'"
-					rm -rf "${entry_path}"
+				for entry_path in "${EFI_MOUNT_PATH}"/loader/entries/frzr*.conf; do
+					if echo "${entry_path}" | grep -Fqx "${NAME}"; then
+						TASK_MSG="deleting deployment boot entry '${entry_path}'"
+						rm -rf "${entry_path}"
+					fi
 				done
 			fi
 
@@ -463,15 +470,16 @@ main() {
 		"FAIL")
 			# This state should only be used if the installation failed
 
-			if [ -d "${SUBVOL}" ]; then
-				if is_btrfs_subvolume "${SUBVOL}"; then
-					local deployment_removal_result=$(btrfs_filtered_subvolume_recursive_delete "${SUBVOL}" "deployments")
-					if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
-						TASK_ERROR=1
-						TASK_ERROR_MSG="Could not delete the new (errored) deployment: ${deployment_removal_result}"
-					fi
-				fi
-			fi
+			# TODO: clean up failed installs in the startup logic, not here!
+			#if [ -d "${SUBVOL}" ]; then
+			#	if is_btrfs_subvolume "${SUBVOL}"; then
+			#		local deployment_removal_result=$(btrfs_filtered_subvolume_recursive_delete "${SUBVOL}" "deployments")
+			#		if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
+			#			TASK_ERROR=1
+			#			TASK_ERROR_MSG="Could not delete the new (errored) deployment: ${deployment_removal_result}"
+			#		fi
+			#	fi
+			#fi
 
 			TASK_STATE="FAIL"
 			RUNNING=false

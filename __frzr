@@ -460,15 +460,15 @@ generate_systemd_boot_cfg() {
 
 			local options=""
 			if [ ! -z "${btrfs_rootfs_uuid}" ]; then
-				options="${options} root=UUID=${btrfs_rootfs_uuid}"
+				options="${options} root=UUID=${btrfs_rootfs_uuid} rw"
 			else
-				options="${options} root=gpt-auto"
+				options="${options} root=gpt-auto rw"
 			fi
 
 			if [ ! -z "${btrfs_rootfs_subvolid}" ]; then
-				options="${options} rw rootflags=subvolid=${btrfs_rootfs_subvolid},noatime"
+				options="${options} rootflags=subvolid=${btrfs_rootfs_subvolid},noatime"
 			else
-				options="${options} rw"
+				options="${options}"
 			fi
 
 			# write kernel cmdline
@@ -526,8 +526,6 @@ prepare_efi_partition() {
 			# $vmlinuz_file is the kernel name of the file in /boot: find the corresponding initramfs file
 			vmlinuz_file="vmlinuz-${kernel_version}"
 			
-			echo "Checking for ${boot_dir}/${vmlinuz_file} and ${boot_dir}/${initramfs_file} " >&2
-
 			# Check if the corresponding vmlinuz file exists
 			if [ -f "${boot_dir}/${vmlinuz_file}" ] && [ -f "${boot_dir}/${initramfs_file}" ]; then
 				# each deployment will need its own kernel(s) as well as initramfs to boot: place them in a EFI subdirectory
