@@ -493,27 +493,27 @@ main() {
 	done
 
 	# umount the subvol /home bind-mount
-	if [ ! -z $SUBVOL_HOME_MOUNT ]; then
+	if [ ! -z "$SUBVOL_HOME_MOUNT" ]; then
 		if mountpoint -q "${SUBVOL_HOME_MOUNT}"; then
 			umount -l "${SUBVOL_HOME_MOUNT}"
 		fi
 	fi
 
 	# umount the subvol /efi bind-mount
-	if [ ! -z $SUBVOL_EFI_MOUNT ]; then
+	if [ ! -z "$SUBVOL_EFI_MOUNT" ]; then
 		if mountpoint -q "${SUBVOL_EFI_MOUNT}"; then
 			umount -l "${SUBVOL_EFI_MOUNT}"
 		fi
 	fi
 
 	# umount the efi path
-	if mountpoint -q ${EFI_MOUNT_PATH}; then
-		umount -l ${EFI_MOUNT_PATH}
+	if mountpoint -q "${EFI_MOUNT_PATH}"; then
+		umount -l "${EFI_MOUNT_PATH}"
 	fi
 
 	# umount the frzr_root subvolume
-	if mountpoint -q ${MOUNT_PATH}; then
-		umount -l ${MOUNT_PATH}
+	if mountpoint -q "${MOUNT_PATH}"; then
+		umount -l "${MOUNT_PATH}"
 	fi
 }
 
