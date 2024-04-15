@@ -516,7 +516,7 @@ prepare_efi_partition() {
 
 	if [ -d "${efi_mount_path}/loader/entries" ]; then
 		# Iterate over each pair of files
-		for vmlinuz_file_path in ${boot_dir}/vmlinuz-*.img; do
+		for vmlinuz_file_path in "${boot_dir}"/vmlinuz-*; do
 			# Extract the matching part of the filename and remove the .img extension
 			kernel_version=$(basename "${vmlinuz_file_path}" | sed 's/^vmlinuz-//')
 
