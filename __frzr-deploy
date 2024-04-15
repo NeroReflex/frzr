@@ -443,8 +443,8 @@ main() {
 					rm -rf "${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
 				fi
 
-				# Delete deployment entries
-				for entry_path in ${EFI_MOUNT_PATH}/loader/entries/${NAME}*.conf; do
+				# Delete deployment entries (this code is based on the fact that names of entries are generated as they are in prepare_efi_partition)
+				for entry_path in "${EFI_MOUNT_PATH}"/loader/entries/frzr-$NAME-*.conf; do
 					TASK_MSG="deleting deployment boot entry '${entry_path}'"
 					rm -rf "${entry_path}"
 				done

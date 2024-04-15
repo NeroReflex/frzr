@@ -439,24 +439,24 @@ generate_systemd_boot_cfg() {
 			echo "title ${entry_name}" > "${entry_conf}"
 
 			# write linux /chimeraos-46_fcc653a3/vmlinuz-linux
-			echo "linux /${version}/${vmlinuz}" > "${entry_conf}"
+			echo "linux /${version}/${vmlinuz}" >> "${entry_conf}"
 
 			# write /chimeraos-46_fcc653a3/amd-ucode.img if necessary
 			if [ -f ${efi_mount_path}/${version}/${amd_ucode} ]; then
-				echo "initrd /${version}/${amd_ucode}" > "${entry_conf}"
+				echo "initrd /${version}/${amd_ucode}" >> "${entry_conf}"
 			else
-				echo "# amd-ucode.img omitted" > "${entry_conf}"
+				echo "# amd-ucode.img omitted" >> "${entry_conf}"
 			fi
 
 			# write /chimeraos-46_fcc653a3/intel-ucode.img if necessary
 			if [ -f ${efi_mount_path}/${version}/${intel_ucode} ]; then
-				echo "initrd /${version}/${intel_ucode}" > "${entry_conf}"
+				echo "initrd /${version}/${intel_ucode}" >> "${entry_conf}"
 			else
-				echo "# intel-ucode.img omitted" > "${entry_conf}"
+				echo "# intel-ucode.img omitted" >> "${entry_conf}"
 			fi
 
 			# write /chimeraos-46_fcc653a3/initrams-linuz.img
-			echo "initrd /${version}/${initramfs}" > "${entry_conf}"
+			echo "initrd /${version}/${initramfs}" >> "${entry_conf}"
 
 			local options=""
 			if [ ! -z "${btrfs_rootfs_uuid}" ]; then
@@ -466,13 +466,13 @@ generate_systemd_boot_cfg() {
 			fi
 
 			if [ ! -z "${btrfs_rootfs_subvolid}" ]; then
-				options="${options} rootflags=subvolid=${btrfs_rootfs_subvolid},rw"
+				options="${options} rw rootflags=subvolid=${btrfs_rootfs_subvolid},noatime"
 			else
 				options="${options} rw"
 			fi
 
 			# write kernel cmdline
-			echo "options ${options} quiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 ${additional_arguments}" > "${entry_conf}"
+			echo "options ${options} quiet splash loglevel=3 rd.systemd.show_status=auto rd.udev.log_priority=3 ${additional_arguments}" >> "${entry_conf}"
 			
 			# return success
 			echo "OK"
