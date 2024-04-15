@@ -380,8 +380,16 @@ main() {
 				TASK_WARNING_MSG="Could not read '${SUBVOL}/usr/lib/frzr.d/bootconfig.conf': default kernel cmdline will be used"
 			fi
 
+			# Make sure the deployment has a /boot directory
+			if [ ! -d "${SUBVOL}/boot" ]; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not find the deployment /boot directory: '${SUBVOL}/boot' not found"
+				STATE="FAIL"
+				continue
+			fi
+
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-			local efi_update_result=$(prepare_efi_partition "${NAME}" "${EFI_MOUNT_PATH}" "${SUBVOL}" "${additional_arguments}" "${rootfs_uuid}" "${rootfs_subvolid}")
+			local efi_update_result=$(prepare_efi_partition "${NAME}" "${EFI_MOUNT_PATH}" "${SUBVOL}/boot" "${additional_arguments}" "${rootfs_uuid}" "${rootfs_subvolid}")
 			if echo "${efi_update_result}" | grep -q 'ERROR'; then
 				# bootloader configuration could not be updated
 				TASK_ERROR=1
