@@ -76,13 +76,14 @@ main() {
 
 			CURRENT=$(frzr-release)
 
-			MOUNT_PATH="/tmp/frzr_root"
+			MOUNT_PATH="/frzr_root"
 
 			# Make sure the frzr_root is mounted during the deployment procedure
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
 			if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
+				MOUNT_PATH="/tmp/frzr_root"
 				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				mkdir -p ${MOUNT_PATH}
 				mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"
@@ -91,15 +92,14 @@ main() {
 
 			if mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
 				DEPLOY_PATH="${MOUNT_PATH}/deployments"
-
+				
 				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path"
 
-				mkdir -p "${DEPLOY_PATH}"
-
 				# Make sure DEPLOY_PATH exists
+				mkdir -p "${DEPLOY_PATH}"
 				if [ ! -d "${DEPLOY_PATH}" ]; then
 					TASK_ERROR=1
-					TASK_ERROR_MSG="Could not bind ${EFI_MOUNT_PATH} to frzr_efi (boot) partition"
+					TASK_ERROR_MSG="Could not create ${DEPLOY_PATH} to to store deployments"
 					STATE="FAIL"
 					continue
 				fi
@@ -155,12 +155,12 @@ main() {
 				FILE_NAME=$(basename ${FRZR_SOURCE})
 				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
-				IMG_FILE=${FRZR_SOURCE}
+				IMG_FILE="${FRZR_SOURCE}"
 			elif [[ "$FRZR_SOURCE" == *".img" ]]; then
 				FILE_NAME=$(basename ${FRZR_SOURCE})
 				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
-				IMG_FILE=${FRZR_SOURCE}
+				IMG_FILE="${FRZR_SOURCE}"
 			else
 				REPO=$(echo "${SOURCE}" | cut -f 1 -d ':')
 				CHANNEL=$(echo "${SOURCE}" | cut -f 2 -d ':')
@@ -373,8 +373,9 @@ main() {
 
 			# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
 			local additional_arguments=""
-			if [ -f ${SUBVOL}/usr/lib/frzr.d/bootconfig.conf ]; then
-				additional_arguments="$additional_arguments $(cat ${SUBVOL}/usr/lib/frzr.d/bootconfig.conf)"
+			if [ -f "${SUBVOL}"/usr/lib/frzr.d/bootconfig.conf ]; then
+				local bootconf_args=$(cat "${SUBVOL}/usr/lib/frzr.d/bootconfig.conf") 
+				additional_arguments="$additional_arguments ${bootconf_args}"
 			else
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Could not read '${SUBVOL}/usr/lib/frzr.d/bootconfig.conf': default kernel cmdline will be used"
@@ -430,7 +431,7 @@ main() {
 				# Remove all sub-subvolumes of the deployment and the deployment itself (use "deployments" as grep to avoid deleting something else)
 				if [ -d "${DEPLOY_PATH}/${deployment_to_be_removed}" ]; then
 					TASK_MSG="deleting deployment ${deployment_to_be_removed}"
-					local deployment_removal_result=$(btrfs_filtered_subvolume_recursive_delete "${DEPLOY_PATH}/${deployment_to_be_removed}" "deployments")
+					local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${deployment_to_be_removed}")
 					if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
 						TASK_ERROR=1
 						TASK_ERROR_MSG="Could not delete the old deployment '${deployment_to_be_removed}', however the new one '${NAME}' will still boot"

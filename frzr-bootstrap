@@ -50,7 +50,7 @@ repair_install() {
 
 		# clear out the etc overlay workdir
 		if [ -d "${frzr_root}/.etc/" ]; then
-			rm -rf ${frzr_root}/.etc/*
+			rm -rf "${frzr_root}"/.etc/*
 		else
 			mkdir -p "${frzr_root}/.etc/"
 		fi
@@ -59,20 +59,20 @@ repair_install() {
 		if [ ! -d "${frzr_root}/var" ]; then
 			btrfs subvolume create ${frzr_root}/var
 		elif is_btrfs_subvolume "${frzr_root}/var"; then
-			rm -rf ${frzr_root}/var/*
+			rm -rf "${frzr_root}"/var/*
 		fi
 
 		# mount the EFI partition
 		mount -t vfat "${boot_efi}" "${frzr_root}/efi/"
 		
 		# remove everything from the EFI partition
-		rm -rf ${frzr_root}/efi/*
+		rm -rf "${frzr_root}"/efi/*
 
 		# reinstall the bootloader
 		bootctl --esp-path="${frzr_root}/efi/" install
 
 		# Delete every installed system
-		if [ -d ${frzr_root}/deployments ]; then
+		if [ -d "${frzr_root}"/deployments ]; then
 			echo "deleting subvolume(s)..."
 			btrfs subvolume delete ${frzr_root}/deployments/* || true
 		fi

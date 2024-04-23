@@ -43,6 +43,29 @@ is_btrfs_subvolume() {
 	esac
 }
 
+# Simply delete a btrfs subvolume.
+# PRE=the subvolume exists and have zero nested subvolumes
+# POST=the subvolume do not exists
+# $1 the subvolume to be deleted
+# stdout "OK" on success, an error string otherwise
+btrfs_subvolume_simple_delete() {
+	local dir=${1}
+
+	if [ -d "${dir}" ]; then
+		if is_btrfs_subvolume "${dir}"; then
+			if btrfs subvolume delete "${dir}"; then
+				echo "OK"
+			else
+				echo "ERROR: Could not delete subvolume '${dir}'"
+			fi
+		else
+			echo "ERROR: Directory '${dir}' is not a valid btrfs subvolume"
+		fi
+	else
+		echo "ERROR: Directory '${dir}' does not exist"
+	fi
+}
+
 # Recursively delete a btrfs subvolume, this function is highly unsafe and therefore subvolumes to be deleted
 # are filtered by a grep argument.
 # PRE=the subvolume exists and have one or more nested subvolumes
