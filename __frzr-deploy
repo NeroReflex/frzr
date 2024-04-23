@@ -512,9 +512,11 @@ main() {
 		umount -l "${EFI_MOUNT_PATH}"
 	fi
 
-	# umount the frzr_root subvolume
+	# umount the frzr_root subvolume (if it was mounted by this tool and not externally)
 	if mountpoint -q "${MOUNT_PATH}"; then
-		umount -l "${MOUNT_PATH}"
+		if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
+			umount -l "${MOUNT_PATH}"
+		fi
 	fi
 }
 

@@ -385,7 +385,7 @@ check_uefi() {
 # POST=
 #
 # $1 the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
-# $2 the deployment mounted subvolume: while migrations are run this has to be read-write
+# $2 the deployment subvolume
 # $3 frzr_root the mounted path to the main btrfs subvolume (the one that contains home as a subvolume)
 # stdout "OK" on success, the error otherwise
 execute_migrations() {
@@ -420,6 +420,58 @@ execute_migrations() {
 
 			unset frzr_migration_version
 		done
+	fi
+}
+
+# Check if there are unlock scripts available in the image to be unlocked and run them one by one
+# Note: post_unlock scripts are functions named unlock inside (executable) files with .unlock extension
+# stored inside $2/usr/lib/frzr.d/
+#
+# Every post_unlock function will be run in a subshell.
+#
+# PRE=$2/usr/lib/frzr.d is a directory
+# POST=
+#
+# $1 the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
+# $2 the mounted subvolume
+# $3 frzr_root the mounted path to the main btrfs subvolume (the one that contains home as a subvolume)
+# stdout "OK" on success, the error otherwise
+execute_unlock() {
+	local version=$1
+	local deployment=$2
+	local frzr_root=$3
+
+	local error=""
+
+	if compgen -G "${deployment}"/usr/lib/frzr.d/*.unlock >/dev/null; then
+		for m in "${deployment}"/usr/lib/frzr.d/*.unlock; do
+			unset frzr_migration_version
+
+			unset -f post_unlock
+
+			# source the migration
+			. $m
+
+			# only execute unlock scripts marked for newer frzr versions
+			if [ -z "${error}" ] && [ ! -z $frzr_migration_version ] && [ $frzr_migration_version -gt 0 ]; then
+				if [ "$(type -t post_unlock)" == function ] ; then
+					local unlock_script_result=$(post_unlock "${frzr_root}" "${deployment}" "${version}")
+					if echo "${unlock_script_result}" | grep -Fqx "ERROR"; then
+						error="${unlock_script_result}"
+					fi
+				fi
+			fi
+
+			unset -f post_unlock
+
+			unset frzr_migration_version
+		done
+	fi
+
+	if [ -z "${error}" ]; then
+		echo "OK"
+	else
+		echo "${error}"
 	fi
 }
 

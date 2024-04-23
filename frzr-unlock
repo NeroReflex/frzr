@@ -10,19 +10,89 @@ if [ $EUID -ne 0 ]; then
 	exit 1
 fi
 
-DEPLOYMENT=$(frzr-release)
-if echo "${DEPLOYMENT}" | grep -Fq 'ERROR'; then
-	echo "frzr-unlock failed: not currently running a from frzr deployment"
-	exit 1
-else
-	# set rootfs btrfs subvolume to read-write mode
-	UNLOCK_RESULT=$(btrfs_subvolume_set_rw "/")
-	if echo "${UNLOCK_RESULT}" | grep -q 'OK'; then
+NAME=""
+
+local RUNNING=true
+STATE="BEGIN"
+while $RUNNING; do
+	case "$STATE" in
+	"BEGIN")
+		MOUNT_PATH="/frzr_root"
+
+		# Make sure the frzr_root is mounted during the deployment procedure
+		# this code is based on the fact that when a btrfs filesystem is created
+		# the default subvolid that is created contextually has the ID set to 256
+		# also as a matter of fact in btrfs is impossible to change subvolumes IDs
+		if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
+			MOUNT_PATH="/tmp/frzr_root"
+			#TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
+			mkdir -p ${MOUNT_PATH}
+			mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"
+			sleep 5
+		fi
+
+		if mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
+			STATE="RELEASE_CHECK"
+		else
+			echo "frzr-unlock failed: could not mount frzr_root"
+			STATE="FAIL"
+			continue
+		fi
+		;;
+
+	"RELEASE_CHECK")
+		# If this is user-specified we should unlock that deployment in particular
+		NAME=$(frzr-release)
+		if echo "${NAME}" | grep -Fq 'ERROR'; then
+			echo "frzr-unlock failed: ${NAME}"
+			STATE="FAIL"
+			continue
+		fi
+		
+		STATE="UNLOCK"
+		;;
+	
+	"UNLOCK")
+		# set rootfs btrfs subvolume to read-write mode
+		UNLOCK_RESULT=$(execute_unlock "${NAME}" "/" "")
+		if echo "${UNLOCK_RESULT}" | grep -q 'ERROR'; then
+			echo "frzr deployment ${NAME} unlock failed: ${UNLOCK_RESULT}"
+			STATE="FAIL"
+			continue
+		fi
+
 		systemctl daemon-reload
 
-		echo "frzr deployment ${DEPLOYMENT} unlock succeeded"
-	else
-		echo "frzr deployment ${DEPLOYMENT} unlock failed: cannot set subvolume to r/w"
-		exit 1
+		STATE="SUCCESS"
+		;;
+	"SUCCESS")
+		# This state should only be used if the unlock completed without errors
+		#TASK_STATE="SUCCESS"
+
+		echo "frzr deployment ${NAME} unlock succeeded"
+
+		RUNNING=false
+		;;
+	"FAIL")
+		# This state should only be used if the unlock failed
+
+		#TASK_STATE="FAIL"
+
+		echo "frzr-unlock failed: ${NAME}"
+
+		RUNNING=false
+		;;
+	*)
+		TASK_STATE="UNKNOWN_ERROR"
+		echo "Something went terribly wrong"
+		RUNNING=false
+		;;
+	esac
+done
+
+# umount the frzr_root subvolume (if it was mounted by this tool and not externally)
+if mountpoint -q "${MOUNT_PATH}"; then
+	if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
+		umount -l "${MOUNT_PATH}"
 	fi
-else
+fi
