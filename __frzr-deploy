@@ -3,7 +3,7 @@
 set -o pipefail
 
 # import methods
-source "${BASH_SOURCE%/*}/__frzr" "$@"
+#source "${BASH_SOURCE%/*}/__frzr" "$@"
 
 main() {
 	#TODO Utilize the state machine to manage the individual proccesses to send signals to external monitors

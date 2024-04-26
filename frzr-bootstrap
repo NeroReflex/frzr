@@ -3,7 +3,7 @@
 set -e
 
 # import methods
-source "${BASH_SOURCE%/*}/__frzr" "$@"
+#source "${BASH_SOURCE%/*}/__frzr" "$@"
 
 # Perform the repair install
 # $1 target (physical) disk
