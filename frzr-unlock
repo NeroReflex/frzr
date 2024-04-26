@@ -12,7 +12,7 @@ fi
 
 NAME=""
 
-local RUNNING=true
+RUNNING=true
 STATE="BEGIN"
 while $RUNNING; do
 	case "$STATE" in
