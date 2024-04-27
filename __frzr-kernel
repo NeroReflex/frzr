@@ -12,6 +12,8 @@ fi
 
 NAME=""
 
+MODULES_DIR="/tmp/modules/"
+
 RUNNING=true
 STATE="BEGIN"
 while $RUNNING; do
@@ -32,7 +34,7 @@ while $RUNNING; do
 		fi
 
 		if mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
-			STATE="RELEASE_CHECK"
+			STATE="DOWNLOAD"
 		else
 			echo "frzr-unlock failed: could not mount frzr_root"
 			STATE="FAIL"
@@ -40,28 +42,22 @@ while $RUNNING; do
 		fi
 		;;
 
-	"RELEASE_CHECK")
-		# If this is user-specified we should unlock that deployment in particular
-		NAME=$(frzr-release)
-		if echo "${NAME}" | grep -Fq 'ERROR'; then
-			echo "frzr-unlock failed: ${NAME}"
-			STATE="FAIL"
-			continue
-		fi
+	"DOWNLOAD")
 		
-		STATE="UNLOCK"
+		
+		STATE="BUILD"
 		;;
 	
-	"UNLOCK")
-		# set rootfs btrfs subvolume to read-write mode
-		UNLOCK_RESULT=$(execute_unlock "${NAME}" "/" "")
-		if echo "${UNLOCK_RESULT}" | grep -q 'ERROR'; then
-			echo "frzr deployment ${NAME} unlock failed: ${UNLOCK_RESULT}"
-			STATE="FAIL"
-			continue
-		fi
+	"BUILD")
+		# Compile the kernel
 
-		systemctl daemon-reload
+		STATE="INITRAMFS"
+		;;
+	"INITRAMFS")
+		# Generate the initramfs
+		if ! mkinitcpio -c "${BASH_SOURCE%/*}/mkinitcpio.conf" -g "/tmp/frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
+            STATE="FAIL"
+        fi
 
 		STATE="SUCCESS"
 		;;
@@ -78,17 +74,25 @@ while $RUNNING; do
 
 		#TASK_STATE="FAIL"
 
-		echo "frzr-unlock failed: ${NAME}"
+		echo "ERROR: frzr-kernel failed"
 
 		RUNNING=false
 		;;
 	*)
 		TASK_STATE="UNKNOWN_ERROR"
-		echo "ERROR: Something went terribly wrong"
+		echo "ERROR: Something went terribly wrong in $(basename $0)"
 		RUNNING=false
 		;;
 	esac
 done
+
+# umount the frzr_root subvolume (if it was mounted by this tool and not externally)
+if mountpoint -q "${MOUNT_PATH}"; then
+	if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
+		umount -l "${MOUNT_PATH}"
+	fi
+fi
+
 
 # umount the frzr_root subvolume (if it was mounted by this tool and not externally)
 if mountpoint -q "${MOUNT_PATH}"; then

@@ -487,7 +487,7 @@ main() {
 			;;
 		*)
 			TASK_STATE="UNKNOWN_ERROR"
-			echo "Something went terribly wrong"
+			echo "ERROR: Something went terribly wrong in $(basename $0)"
 			RUNNING=false
 			;;
 		esac

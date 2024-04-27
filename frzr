@@ -140,6 +140,7 @@ arg2=$3
 if [ $function == "help" ]; then
     echo "[Usage]
 frzr deploy [Check for system updates and update the system if available]
+frzr kernel [Deploy a custom kernel]
 frzr set-channel [Set the update channel stable/testing/unstable]
 frzr get-channel [Get the update channel currently in use]
 frzr version [Get the version of FRZR]
@@ -168,6 +169,28 @@ elif [ $function == "deploy" ]; then
     rm -f /tmp/frzr.lock
 
     exit $RESULT
+elif [ $function == "kernel" ]; then
+    # Check if the lock file exists
+    if [ -f "/tmp/frzr-kernel.lock" ]; then
+        echo "$(basename $0) is already running"
+        exit 255
+    fi
+
+    # Create the lock file
+    touch "/tmp/frzr-kernel.lock"
+
+    frzr_check_bootenv
+    # We don't want to pass the function parameter to __frzr-deploy
+    shift
+    source "${BASH_SOURCE%/*}/__frzr-kernel" "$@"
+    RESULT=$?
+
+    # Remove the lock file
+    rm -f "/tmp/frzr-kernel.lock"
+
+    exit $RESULT
+elif [ $function == "release" ]; then
+    source "${BASH_SOURCE%/*}/frzr-release" "$@"
 elif [ $function == "version" ]; then
     echo "frzr-release"
     #TODO Update frzr-release logic
