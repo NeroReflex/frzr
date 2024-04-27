@@ -150,7 +150,7 @@ fresh_install() {
 	fi
 
 	if [[ $HOME_PART_NUMBER -ne 0 ]]; then
-		# split / and /home in to partitions
+		# split / and /home into two partitions
 
 		parted --script ${disk} \
 			mkpart primary btrfs ${ROOT_START}GiB ${ROOT_END}GiB \
