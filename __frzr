@@ -406,12 +406,20 @@ execute_migrations() {
 			# only execute migrations marked for newer frzr versions
 			if [ ! -z $frzr_migration_version ] && [ $frzr_migration_version -gt 0 ]; then
 				if [ "$(type -t post_install)" == function ] ; then
-					post_install "${frzr_root}" "${deployment}" "${version}"
+					local install_migration_first_error=$(post_install "${frzr_root}" "${deployment}" "${version}")
+
+					if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
+						break
+					fi
 				fi
 
 				if [ "$(type -t chroot_post_install)" == function ] ; then
 					# TODO: use something like arch-chroot to execute commands from the final image
-					echo "TODO: use something like arch-chroot to execute commands from the final image"
+					local install_migration_first_error="OK"
+
+					if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
+						break
+					fi
 				fi
 			fi
 
@@ -420,6 +428,14 @@ execute_migrations() {
 
 			unset frzr_migration_version
 		done
+
+		if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
+			echo "ERROR: Could not execute migration '$m': ${install_migration_first_error}"
+		else
+			echo "OK"
+		fi
+	else
+		echo "OK"
 	fi
 }
 
