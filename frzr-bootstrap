@@ -196,8 +196,17 @@ fresh_install() {
 		swapon "${swap_part}" # activate swap for the installer
 	fi	
 
+	# create /home subvolume
+	btrfs subvolume create "${frzr_root}/home"
+
+	# set the /home as no copy-on-write
+	chattr +C "${frzr_root}/home"
+
 	# setup home partition
 	if [[ $HOME_PART_NUMBER -ne 0 ]]; then
+		# Delete the /home subvolume so that it can't be mounted (subvolume ids are never reused by btrfs)
+		btrfs subvolume delete "${frzr_root}/home"
+
 		local home_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${HOME_PART_NUMBER}$")
 		
 		if [[ SEPARATE_HOME_FS == "ext4" ]]; then
@@ -216,12 +225,6 @@ fresh_install() {
 
 		local home_uuid=$(blkid -s UUID -o value "${home_part}")
 		echo "${home_uuid}" >${frzr_root}/home_uuid
-	else
-		# create /home subvolume
-		btrfs subvolume create "${frzr_root}/home"
-
-		# set the /home as no copy-on-write
-		chattr +C "${frzr_root}/home"
 	fi
 
 	# create folder for the gamer user
