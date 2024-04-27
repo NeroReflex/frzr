@@ -214,3 +214,8 @@ elif [ $function == "package-options" ]; then
 else
     echo "invalid argument"
 fi
+
+# print out the latest error in stderr (this is meant for debugging)
+if [ ! -z "${TASK_ERROR_MSG}" ]; then
+    echo "${TASK_ERROR_MSG}" 1>&2
+fi

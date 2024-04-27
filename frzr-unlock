@@ -90,9 +90,18 @@ while $RUNNING; do
 	esac
 done
 
+# umount the efi path
+if [ ! "${EFI_MOUNT_PATH}" = "/efi" ]; then
+	if mountpoint -q "${EFI_MOUNT_PATH}"; then
+		umount -l "${EFI_MOUNT_PATH}"
+	fi
+fi
+
 # umount the frzr_root subvolume (if it was mounted by this tool and not externally)
-if mountpoint -q "${MOUNT_PATH}"; then
-	if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
-		umount -l "${MOUNT_PATH}"
+if [ ! "${MOUNT_PATH}" = "/frzr_root" ]; then
+	if mountpoint -q "${MOUNT_PATH}"; then
+		if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
+			umount -l "${MOUNT_PATH}"
+		fi
 	fi
 fi

@@ -10,7 +10,7 @@ if [ $EUID -ne 0 ]; then
 	exit 1
 fi
 
-NAME=""
+KERNEL_NAME=""
 
 MODULES_DIR="/tmp/modules/"
 
@@ -33,39 +33,74 @@ while $RUNNING; do
 			sleep 5
 		fi
 
-		if mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
-			STATE="DOWNLOAD"
-		else
-			echo "frzr-unlock failed: could not mount frzr_root"
+		if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
+			echo "frzr-kernel failed: could not mount frzr_root"
 			STATE="FAIL"
 			continue
 		fi
+
+        # Make sure the EFI partition is mounted during the deployment procedure
+        EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
+
+        if ! mountpoint -q "${EFI_MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
+            mkdir -p "${EFI_MOUNT_PATH}"
+            mount -L frzr_efi "${EFI_MOUNT_PATH}"
+            sleep 5
+        fi
+
+        # Check the "EFI System" partition is actually mounted
+        if ! mountpoint -q "${EFI_MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
+            TASK_ERROR=1
+            TASK_ERROR_MSG="Could not bind ${EFI_MOUNT_PATH} to frzr_efi (boot) partition"
+            STATE="FAIL"
+            continue
+        fi
+
+        STATE="DOWNLOAD"
 		;;
 
 	"DOWNLOAD")
-		
+		if [ -f ".config" ]; then
+            TASK_ERROR=1
+            TASK_ERROR_MSG="Could not find kernel configuration"
+            STATE="FAIL"
+            continue
+        fi
 		
 		STATE="BUILD"
 		;;
 	
 	"BUILD")
-		# Compile the kernel
+        # Fetch the name of the kernel (uname -r)
+        KERNEL_NAME=$(make -s kernelrelease)
+
+        # TODO: multicore?
+        if ! make all; then
+            TASK_ERROR=1
+            TASK_ERROR_MSG="ERROR: missing .config file"
+            STATE="FAIL"
+            continue
+        fi
 
 		STATE="INITRAMFS"
 		;;
 	"INITRAMFS")
 		# Generate the initramfs
-		if ! mkinitcpio -c "${BASH_SOURCE%/*}/mkinitcpio.conf" -g "/tmp/frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
+		if ! mkinitcpio -c "${BASH_SOURCE%/*}/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
             STATE="FAIL"
         fi
 
-		STATE="SUCCESS"
+		STATE="BOOTLOADER"
 		;;
+    "BOOTLOADER")
+        # TODO: write "${EFI_MOUNT_PATH}/loader/entries/frzr_kernel.conf"
+        STATE="SUCCESS"
+        ;;
 	"SUCCESS")
 		# This state should only be used if the unlock completed without errors
 		#TASK_STATE="SUCCESS"
 
-		echo "frzr deployment ${NAME} unlock succeeded"
+		echo "frzr kernel deployment succeeded"
 
 		RUNNING=false
 		;;
@@ -74,7 +109,7 @@ while $RUNNING; do
 
 		#TASK_STATE="FAIL"
 
-		echo "ERROR: frzr-kernel failed"
+		echo "ERROR: frzr-kernel failed: ${TASK_ERROR_MSG}"
 
 		RUNNING=false
 		;;
@@ -86,17 +121,18 @@ while $RUNNING; do
 	esac
 done
 
-# umount the frzr_root subvolume (if it was mounted by this tool and not externally)
-if mountpoint -q "${MOUNT_PATH}"; then
-	if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
-		umount -l "${MOUNT_PATH}"
-	fi
+# umount the efi path
+if [ ! "${EFI_MOUNT_PATH}" = "/efi" ]; then
+    if mountpoint -q "${EFI_MOUNT_PATH}"; then
+        umount -l "${EFI_MOUNT_PATH}"
+    fi
 fi
 
-
 # umount the frzr_root subvolume (if it was mounted by this tool and not externally)
-if mountpoint -q "${MOUNT_PATH}"; then
-	if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
-		umount -l "${MOUNT_PATH}"
-	fi
+if [ ! "${MOUNT_PATH}" = "/frzr_root" ]; then
+    if mountpoint -q "${MOUNT_PATH}"; then
+        if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
+            umount -l "${MOUNT_PATH}"
+        fi
+    fi
 fi

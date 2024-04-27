@@ -272,6 +272,7 @@ main() {
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Error extracting the deployment image: ${install_result}"
 				STATE="FAIL"
+				continue
 			fi
 
 			STATE="INSTALL"
@@ -508,14 +509,18 @@ main() {
 	fi
 
 	# umount the efi path
-	if mountpoint -q "${EFI_MOUNT_PATH}"; then
-		umount -l "${EFI_MOUNT_PATH}"
+	if [ ! "${EFI_MOUNT_PATH}" = "/efi" ]; then
+		if mountpoint -q "${EFI_MOUNT_PATH}"; then
+			umount -l "${EFI_MOUNT_PATH}"
+		fi
 	fi
 
 	# umount the frzr_root subvolume (if it was mounted by this tool and not externally)
-	if mountpoint -q "${MOUNT_PATH}"; then
-		if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
-			umount -l "${MOUNT_PATH}"
+	if [ ! "${MOUNT_PATH}" = "/frzr_root" ]; then
+		if mountpoint -q "${MOUNT_PATH}"; then
+			if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
+				umount -l "${MOUNT_PATH}"
+			fi
 		fi
 	fi
 }

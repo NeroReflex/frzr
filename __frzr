@@ -619,12 +619,13 @@ prepare_efi_partition() {
 				if cp "${boot_dir}/${vmlinuz_file}" "${efi_mount_path}/${version}/${vmlinuz_file}"; then
 					if cp "${boot_dir}/${initramfs_file}" "${efi_mount_path}/${version}/${initramfs_file}"; then
 						local boot_entry="frzr-${version}-${kernel_version}.conf"
-						default_boot_cfg="${boot_entry}"
-
+						
 						# Write the configuration entry
 						local systemd_boot_update_result=$(generate_systemd_boot_cfg "${version}" "${boot_entry}" "${version} (${kernel_version})" "${efi_mount_path}" "${amd_ucode}" "${intel_ucode}" "${vmlinuz_file}" "${initramfs_file}" "${additional_arguments}" "${btrfs_rootfs_uuid}" "${btrfs_rootfs_subvolid}")
 						if echo "${systemd_boot_update_result}" | grep -q 'ERROR'; then
 							echo "ERROR: Could not add bootloader entry: ${systemd_boot_update_result}"
+						else
+							default_boot_cfg="${boot_entry}"
 						fi
 					else
 						echo "ERROR: Could not copy '${boot_dir}/${initramfs_file}' to '${efi_mount_path}/${version}/${initramfs_file}'"
@@ -635,13 +636,16 @@ prepare_efi_partition() {
 			fi
 		done
 
-		# TODO: check for kernel override
+		# override the default deployment boot with the user-provided one
+		if [ -f "${efi_mount_path}/loader/entries/frzr_kernel.conf" ]; then
+			default_boot_cfg="frzr_kernel.conf"
+		fi
 
 		# write the default boot entry
 		if [ -z "$default_boot_cfg" ]; then
 			echo "ERROR: no bootable kernel found"
 		else
-			echo "default ${default_boot_cfg}" > ${efi_mount_path}/loader/loader.conf
+			echo "default ${default_boot_cfg}" > "${efi_mount_path}/loader/loader.conf"
 
 			echo "OK"
 		fi
