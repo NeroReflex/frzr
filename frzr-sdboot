@@ -1,20 +1,14 @@
 #! /bin/bash
 
-set -e
-
 # import methods
 #source "${BASH_SOURCE%/*}/__frzr" "$@"
 
-kernel() {
-
-	KERNEL_NAME=""
-
-	MODULES_DIR="/tmp/modules/"
-
-	MOUNTED_MOUNT_PATH="no"
+sdboot() {
+    MOUNTED_MOUNT_PATH="no"
 	MOUNTED_EFI_MOUNT_PATH="no"
 
-	RUNNING=true
+	local RUNNING=true
+    RUNNING=true
 	STATE="BEGIN"
 	while $RUNNING; do
 		case "$STATE" in
@@ -60,51 +54,20 @@ kernel() {
 				continue
 			fi
 
-			STATE="DOWNLOAD"
+			STATE="CONFIGURE"
 			;;
 
-		"DOWNLOAD")
-			if [ -f ".config" ]; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not find kernel configuration"
-				STATE="FAIL"
-				continue
-			fi
-			
-			STATE="BUILD"
-			;;
-		
-		"BUILD")
-			# Fetch the name of the kernel (uname -r)
-			KERNEL_NAME=$(make -s kernelrelease)
+		"CONFIGURE")
+            # TODO: execute prepare_efi_partition here
 
-			# TODO: multicore?
-			if ! make all; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="ERROR: missing .config file"
-				STATE="FAIL"
-				continue
-			fi
-
-			STATE="INITRAMFS"
-			;;
-		"INITRAMFS")
-			# Generate the initramfs
-			if ! mkinitcpio -c "${BASH_SOURCE%/*}/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
-				STATE="FAIL"
-			fi
-
-			STATE="BOOTLOADER"
-			;;
-		"BOOTLOADER")
-			# TODO: write "${EFI_MOUNT_PATH}/loader/entries/frzr_kernel.conf"
-			STATE="SUCCESS"
-			;;
+            STATE="SUCCESS"
+            ;;
+            
 		"SUCCESS")
 			# This state should only be used if the unlock completed without errors
 			#TASK_STATE="SUCCESS"
 
-			echo "frzr kernel deployment succeeded"
+			echo "systemd-boot configuration update success"
 
 			RUNNING=false
 			;;

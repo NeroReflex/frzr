@@ -150,15 +150,6 @@ frzr bootstrap [Format and configure a drive to be used with FRZR]"
 elif [ $function == "bootstrap" ]; then
     source frzr-bootstrap $arg1
 elif [ $function == "deploy" ]; then
-    # Check if the lock file exists
-    if [ -f /tmp/frzr.lock ]; then
-        echo "$(basename $0) is already running"
-        exit 255
-    fi
-
-    # Create the lock file
-    touch /tmp/frzr.lock
-
     frzr_check_bootenv
     # We don't want to pass the function parameter to __frzr-deploy
     shift
@@ -173,23 +164,17 @@ elif [ $function == "deploy" ]; then
 
     exit $RESULT
 elif [ $function == "kernel" ]; then
-    # Check if the lock file exists
-    if [ -f "/tmp/frzr-kernel.lock" ]; then
-        echo "$(basename $0) is already running"
-        exit 255
-    fi
-
-    # Create the lock file
-    touch "/tmp/frzr-kernel.lock"
-
     frzr_check_bootenv
     # We don't want to pass the function parameter to __frzr-deploy
     shift
-    source "${BASH_SOURCE%/*}/__frzr-kernel" "$@"
+    source "${BASH_SOURCE%/*}/__frzr-kernel"
+
+    flock -E 255 -n /tmp/frzr.lock --command "kernel $@"
     RESULT=$?
 
-    # Remove the lock file
-    rm -f "/tmp/frzr-kernel.lock"
+    if [ $RESULT == 255 ]; then
+        echo "$(basename $0) is already running"
+    fi
 
     exit $RESULT
 elif [ $function == "release" ]; then

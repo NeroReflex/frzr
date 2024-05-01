@@ -21,6 +21,9 @@ deploy() {
 	FRZR_SOURCE=""
 	FRZR_PARAMS=""
 
+	MOUNTED_MOUNT_PATH="no"
+	MOUNTED_EFI_MOUNT_PATH="no"
+
 	local RUNNING=true
 	STATE="FRZR_DEPLOY_CHECK"
 	while $RUNNING; do
@@ -86,7 +89,9 @@ deploy() {
 				MOUNT_PATH="/tmp/frzr_root"
 				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				mkdir -p ${MOUNT_PATH}
-				mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"
+				if mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"; then
+					MOUNTED_MOUNT_PATH="yes"
+				fi
 				sleep 5
 			fi
 
@@ -113,7 +118,9 @@ deploy() {
 
 				if ! mountpoint -q "${EFI_MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
 					mkdir -p "${EFI_MOUNT_PATH}"
-					mount -L frzr_efi "${EFI_MOUNT_PATH}"
+					if mount -L frzr_efi "${EFI_MOUNT_PATH}"; then
+						MOUNTED_EFI_MOUNT_PATH="yes"
+					fi
 					sleep 5
 				fi
 
@@ -509,18 +516,16 @@ deploy() {
 	fi
 
 	# umount the efi path
-	if [ ! "${EFI_MOUNT_PATH}" = "/efi" ]; then
+	if [ "${MOUNTED_EFI_MOUNT_PATH}" = "yes" ]; then
 		if mountpoint -q "${EFI_MOUNT_PATH}"; then
 			umount -l "${EFI_MOUNT_PATH}"
 		fi
 	fi
 
 	# umount the frzr_root subvolume (if it was mounted by this tool and not externally)
-	if [ ! "${MOUNT_PATH}" = "/frzr_root" ]; then
+	if [ "${MOUNTED_MOUNT_PATH}" = "yes" ]; then
 		if mountpoint -q "${MOUNT_PATH}"; then
-			if echo "${MOUNT_PATH}" | grep -Fqx "/tmp/"; then
-				umount -l "${MOUNT_PATH}"
-			fi
+			umount -l "${MOUNT_PATH}"
 		fi
 	fi
 }
