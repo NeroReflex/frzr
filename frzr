@@ -162,11 +162,14 @@ elif [ $function == "deploy" ]; then
     frzr_check_bootenv
     # We don't want to pass the function parameter to __frzr-deploy
     shift
-    source "${BASH_SOURCE%/*}/__frzr-deploy" "$@"
+    source "${BASH_SOURCE%/*}/__frzr-deploy"
+
+    flock -E 255 -n /tmp/frzr.lock --command "deploy $@"
     RESULT=$?
 
-    # Remove the lock file
-    rm -f /tmp/frzr.lock
+    if [ $RESULT == 255 ]; then
+        echo "$(basename $0) is already running"
+    fi
 
     exit $RESULT
 elif [ $function == "kernel" ]; then

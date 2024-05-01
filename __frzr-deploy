@@ -5,7 +5,7 @@ set -o pipefail
 # import methods
 #source "${BASH_SOURCE%/*}/__frzr" "$@"
 
-main() {
+deploy() {
 	#TODO Utilize the state machine to manage the individual proccesses to send signals to external monitors
 	## Signals
 	#TASK_STATE="" # The current state of the state machine
@@ -524,10 +524,3 @@ main() {
 		fi
 	fi
 }
-
-# Start the main() method like this for now since the old logic doesn't work
-main "$@"
-
-#if [ "$0" = "$BASH_SOURCE" ]; then
-#	main "$@"
-#fi

@@ -5,8 +5,9 @@ if [ $EUID -ne 0 ]; then
 	exit 1
 fi
 
+source "${BASH_SOURCE%/*}/__frzr-deploy"
 
-flock -E 255 -n /tmp/frzr.lock ${BASH_SOURCE%/*}/__frzr-deploy $@
+flock -E 255 -n /tmp/frzr.lock --command "deploy $@"
 RESULT=$?
 
 if [ $RESULT == 255 ]; then
