@@ -356,7 +356,7 @@ frzr_deploy() {
 		"CLEANUP")
 			TASK_STATE="CLEANUP"
 			# Delete the downloaded system img etc.
-
+			echo "Doing frzr_sdboot"
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
 			local efi_update_result=${frzr_sdboot "${NAME}"}
 			if echo "${efi_update_result}" | grep -q 'ERROR'; then
@@ -366,10 +366,10 @@ frzr_deploy() {
 				STATE="FAIL"
 				continue
 			fi
-
+			echo "Done frzr_sdboot"
 			# Remove download artifacts (if any)
 			rm -f ${MOUNT_PATH}/*.img.*
-
+			echo "Doing btrfs subvolume set-default $subvolid ${MOUNT_PATH}"
 			# Activates the new deployed image by making it the default btrfs subvolume
 			# systemd-equipped initramfs images will automount the default subvolume as the rootfs
 			TASK_MSG="Activating the new deployment (subvolid=${subvolid}) as the default subvolume"
@@ -379,7 +379,7 @@ frzr_deploy() {
 				STATE="FAIL"
 				continue
 			fi
-
+			echo "Done btrfs subvolume set-default"
 			# After the new image has been deployed and is bootable
 			# delete old deployments under these conditions:
 			# - we are currently running inside a frzr deployment (i.e. not during install)
@@ -414,13 +414,16 @@ frzr_deploy() {
 				# Delete deployment boot files taking up space in /efi 
 				if [ -f "${EFI_MOUNT_PATH}/${deployment_to_be_removed}" ]; then
 					TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${deployment_to_be_removed}'"
+					echo "Doing rm -rf ${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
 					rm -rf "${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
+					echo "Done rm -rf"
 				fi
 
 				# Delete deployment entries (this code is based on the fact that names of entries are generated as they are in prepare_efi_partition)
 				for entry_path in "${EFI_MOUNT_PATH}"/loader/entries/frzr*.conf; do
 					if echo "${entry_path}" | grep -Fqx "${NAME}"; then
 						TASK_MSG="deleting deployment boot entry '${entry_path}'"
+						echo "Doing rm -rf ${entry_path}"
 						rm -rf "${entry_path}"
 					fi
 				done
@@ -429,6 +432,7 @@ frzr_deploy() {
 			STATE="SUCCESS"
 			;;
 		"SUCCESS")
+			echo "Entering SUCCESS case"
 			# This state should only be used if the installation completed without errors
 			TASK_STATE="SUCCESS"
 
@@ -437,6 +441,7 @@ frzr_deploy() {
 			RUNNING=false
 			;;
 		"FAIL")
+			echo "Entering FAIL case"
 			# This state should only be used if the installation failed
 
 			# TODO: clean up failed installs in the startup logic, not here!
@@ -460,28 +465,28 @@ frzr_deploy() {
 			;;
 		esac
 	done
-
+	echo "1"
 	# umount the subvol /home bind-mount
 	if [ ! -z "$SUBVOL_HOME_MOUNT" ]; then
 		if mountpoint -q "${SUBVOL_HOME_MOUNT}"; then
 			umount -l "${SUBVOL_HOME_MOUNT}"
 		fi
 	fi
-
+	echo "2"
 	# umount the subvol /efi bind-mount
 	if [ ! -z "$SUBVOL_EFI_MOUNT" ]; then
 		if mountpoint -q "${SUBVOL_EFI_MOUNT}"; then
 			umount -l "${SUBVOL_EFI_MOUNT}"
 		fi
 	fi
-
+	echo "3"
 	# umount the efi path
 	if [ "${MOUNTED_EFI_MOUNT_PATH}" = "yes" ]; then
 		if mountpoint -q "${EFI_MOUNT_PATH}"; then
 			umount -l "${EFI_MOUNT_PATH}"
 		fi
 	fi
-
+	echo "4"
 	# umount the frzr_root subvolume (if it was mounted by this tool and not externally)
 	if [ "${MOUNTED_MOUNT_PATH}" = "yes" ]; then
 		if mountpoint -q "${MOUNT_PATH}"; then
