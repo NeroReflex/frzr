@@ -4,6 +4,12 @@
 #source "${BASH_SOURCE%/*}/__frzr" "$@"
 
 sdboot() {
+    NAME=${1}
+
+    # by default the deployment is the running one
+    DEPLOY_PATH="/"
+    SUBVOL="/"
+
     MOUNTED_MOUNT_PATH="no"
 	MOUNTED_EFI_MOUNT_PATH="no"
 
@@ -54,11 +60,93 @@ sdboot() {
 				continue
 			fi
 
-			STATE="CONFIGURE"
+			STATE="CHECK"
 			;;
 
+        "CHECK")
+            if [ -z "$NAME" ]; then
+                if [ -e "/build_info" ]; then
+	                NAME=$(cat "/build_info" | head -1)
+                fi
+
+                if [ -z "$NAME" ]; then
+                    TASK_ERROR_MSG="Could not fetch deployment name"
+                    STATE="FAIL"
+                    continue
+                fi
+            else
+                DEPLOY_PATH="${MOUNT_PATH}/deployments"
+                SUBVOL="${DEPLOY_PATH}/${NAME}"
+
+                # Make sure DEPLOY_PATH exists
+                mkdir -p "${DEPLOY_PATH}"
+                if [ ! -d "${DEPLOY_PATH}" ]; then
+                    TASK_ERROR=1
+                    TASK_ERROR_MSG="Could not create ${DEPLOY_PATH} to to store deployments"
+                    STATE="FAIL"
+                    continue
+                fi
+                
+                # Make sure SUBVOL exists
+                if [ ! -d "${SUBVOL}" ]; then
+                    TASK_ERROR=1
+                    TASK_ERROR_MSG="Could not find deployment '${NAME}', '${SUBVOL}' was searched"
+                    STATE="FAIL"
+                    continue
+                fi
+            fi
+
+            STATE="CONFIGURE"
+            ;;
+
 		"CONFIGURE")
-            # TODO: execute prepare_efi_partition here
+            # Get the rootfs UUID: this will be used in generating the systemd-boot entry
+			TASK_MSG="Finding deployment partition UUID"
+			local rootfs_uuid=$(get_uuid "$SUBVOL")
+			if echo "$rootfs_uuid" | grep -Fqx "ERROR"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not find rootfs UUID of the new deployment"
+				STATE="FAIL"
+				continue
+			fi
+
+			# Get the subvolid: this will be used in generating the systemd-boot entry and setting is as the default for the automatic boot
+			TASK_MSG="Finding deployment subvolume ID"
+			local rootfs_subvolid=$(btrfs_subvol_get_id "$SUBVOL")
+			if echo "$subvolid" | grep -Fqx "ERROR"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
+				STATE="FAIL"
+				continue
+			fi
+
+			# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
+			local additional_arguments=""
+			if [ -f "${SUBVOL}"/usr/lib/frzr.d/bootconfig.conf ]; then
+				local bootconf_args=$(cat "${SUBVOL}/usr/lib/frzr.d/bootconfig.conf") 
+				additional_arguments="$additional_arguments ${bootconf_args}"
+			else
+				TASK_WARNING=1
+				TASK_WARNING_MSG="Could not read '${SUBVOL}/usr/lib/frzr.d/bootconfig.conf': default kernel cmdline will be used"
+			fi
+
+			# Make sure the deployment has a /boot directory
+			if [ ! -d "${SUBVOL}/boot" ]; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not find the deployment /boot directory: '${SUBVOL}/boot' not found"
+				STATE="FAIL"
+				continue
+			fi
+
+            # This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
+			local efi_update_result=$(prepare_efi_partition "${NAME}" "${EFI_MOUNT_PATH}" "${SUBVOL}/boot" "${additional_arguments}" "${rootfs_uuid}" "${rootfs_subvolid}")
+			if echo "${efi_update_result}" | grep -q 'ERROR'; then
+				# bootloader configuration could not be updated
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not update the EFI partition: ${efi_update_result}"
+				STATE="FAIL"
+				continue
+			fi
 
             STATE="SUCCESS"
             ;;
@@ -76,7 +164,7 @@ sdboot() {
 
 			#TASK_STATE="FAIL"
 
-			echo "ERROR: frzr-kernel failed: ${TASK_ERROR_MSG}"
+			echo "ERROR: frzr-sdboot failed: ${TASK_ERROR_MSG}"
 
 			RUNNING=false
 			;;

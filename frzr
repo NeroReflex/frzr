@@ -159,7 +159,7 @@ elif [ $function == "deploy" ]; then
     RESULT=$?
 
     if [ $RESULT == 255 ]; then
-        echo "$(basename $0) is already running"
+        echo "ERROR: $(basename $0) is already running"
     fi
 
     exit $RESULT
@@ -173,7 +173,7 @@ elif [ $function == "kernel" ]; then
     RESULT=$?
 
     if [ $RESULT == 255 ]; then
-        echo "$(basename $0) is already running"
+        echo "ERROR: $(basename $0) is already running"
     fi
 
     exit $RESULT
