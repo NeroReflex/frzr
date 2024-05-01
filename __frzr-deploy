@@ -109,8 +109,6 @@ deploy() {
 					continue
 				fi
 
-				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path"
-
 				# Make sure the EFI partition is mounted during the deployment procedure
 				EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
 
