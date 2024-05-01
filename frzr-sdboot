@@ -3,15 +3,15 @@
 # import methods
 #source "${BASH_SOURCE%/*}/__frzr" "$@"
 
-sdboot() {
+frzr_sdboot() {
     NAME=${1}
 
     # by default the deployment is the running one
     DEPLOY_PATH="/"
     SUBVOL="/"
 
-    MOUNTED_MOUNT_PATH="no"
-	MOUNTED_EFI_MOUNT_PATH="no"
+    local MOUNTED_MOUNT_PATH="no"
+	local MOUNTED_EFI_MOUNT_PATH="no"
 
 	local RUNNING=true
     RUNNING=true
@@ -118,11 +118,15 @@ sdboot() {
 				TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
 				STATE="FAIL"
 				continue
+            elif [ "${rootfs_subvolid}" = "5" ]; then
+                TASK_ERROR_MSG="Could not identify the correct subvolid of the running deployment"
+				STATE="FAIL"
+				continue
 			fi
 
 			# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
 			local additional_arguments=""
-			if [ -f "${SUBVOL}"/usr/lib/frzr.d/bootconfig.conf ]; then
+			if [ -f "${SUBVOL}/usr/lib/frzr.d/bootconfig.conf" ]; then
 				local bootconf_args=$(cat "${SUBVOL}/usr/lib/frzr.d/bootconfig.conf") 
 				additional_arguments="$additional_arguments ${bootconf_args}"
 			else

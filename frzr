@@ -3,7 +3,8 @@
 set -Ee
 
 # All global variables are sourced from __frzr-debug
-source __frzr-debug
+source "${BASH_SOURCE%/*}/__frzr-debug"
+
 # Import methods
 source "${BASH_SOURCE%/*}/__frzr" "$@"
 
@@ -137,6 +138,9 @@ function=$1
 arg1=$2
 arg2=$3
 
+source "${BASH_SOURCE%/*}/__frzr-deploy"
+source "${BASH_SOURCE%/*}/frzr-sdboot"
+
 if [ $function == "help" ]; then
     echo "[Usage]
 frzr deploy [Check for system updates and update the system if available]
@@ -153,9 +157,8 @@ elif [ $function == "deploy" ]; then
     frzr_check_bootenv
     # We don't want to pass the function parameter to __frzr-deploy
     shift
-    source "${BASH_SOURCE%/*}/__frzr-deploy"
 
-    flock -E 255 -n /tmp/frzr.lock --command "deploy $@"
+    flock -E 255 -n /tmp/frzr.lock "frzr_deploy" "$@"
     RESULT=$?
 
     if [ $RESULT == 255 ]; then
@@ -169,7 +172,7 @@ elif [ $function == "kernel" ]; then
     shift
     source "${BASH_SOURCE%/*}/__frzr-kernel"
 
-    flock -E 255 -n /tmp/frzr.lock --command "kernel $@"
+    flock -E 255 -n /tmp/frzr.lock "kernel" "$@"
     RESULT=$?
 
     if [ $RESULT == 255 ]; then
