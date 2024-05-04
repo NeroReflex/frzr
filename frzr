@@ -158,12 +158,13 @@ elif [ $function == "deploy" ]; then
     # We don't want to pass the function parameter to __frzr-deploy
     shift
 
-    flock -E 255 -n /tmp/frzr.lock "frzr_deploy" "$@"
+    #flock -E 255 -n /tmp/frzr.lock "frzr-deploy" "$@"
+    frzr-deploy "$@"
     RESULT=$?
 
-    if [ $RESULT == 255 ]; then
-        echo "ERROR: $(basename $0) is already running"
-    fi
+    #if [ $RESULT == 255 ]; then
+    #    echo "ERROR: $(basename $0) is already running"
+    #fi
 
     exit $RESULT
 elif [ $function == "kernel" ]; then
