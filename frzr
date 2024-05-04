@@ -138,9 +138,6 @@ function=$1
 arg1=$2
 arg2=$3
 
-source "${BASH_SOURCE%/*}/__frzr-deploy"
-source "${BASH_SOURCE%/*}/frzr-sdboot"
-
 if [ $function == "help" ]; then
     echo "[Usage]
 frzr deploy [Check for system updates and update the system if available]
