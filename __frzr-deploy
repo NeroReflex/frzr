@@ -201,7 +201,7 @@ frzr_deploy() {
 						MSG="${NAME} is already installed, would you like to delete this and re-deploy?"
 						if (whiptail --yesno "${MSG}" 10 50); then
 							echo "deleting ${NAME}"
-							btrfs subvolume delete ${SUBVOL}
+							btrfs subvolume delete "${SUBVOL}"
 							rm -rf "${EFI_MOUNT_PATH}/${NAME}"
 						fi
 					else
@@ -399,6 +399,7 @@ frzr_deploy() {
 				# Remove all sub-subvolumes of the deployment and the deployment itself (use "deployments" as grep to avoid deleting something else)
 				if [ -d "${DEPLOY_PATH}/${deployment_to_be_removed}" ]; then
 					TASK_MSG="deleting deployment ${deployment_to_be_removed}"
+					echo "$TASK_MSG"
 					local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${deployment_to_be_removed}")
 					if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
 						TASK_ERROR=1
