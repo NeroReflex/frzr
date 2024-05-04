@@ -159,7 +159,7 @@ elif [ $function == "deploy" ]; then
     shift
 
     #flock -E 255 -n /tmp/frzr.lock "frzr-deploy" "$@"
-    frzr-deploy "$@"
+    source "${BASH_SOURCE%/*}/frzr-deploy" "$@"
     RESULT=$?
 
     #if [ $RESULT == 255 ]; then
