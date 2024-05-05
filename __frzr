@@ -330,28 +330,6 @@ get_img_url() {
 	echo $result
 }
 
-# Get an unused deployment that will be removed
-#
-# PRE=$3 is the directory holding deployments
-# POST=
-#
-# $1 the name of the currently running version
-# $2 the name of another bootable version to be kept (usually the version being deployed)
-# $3 the deployment path (mind not inserting a final /)
-#
-# stdout the name of a deployment to be removed, "" if none is to be removed, the error otherwise
-get_deployment_to_delete() {
-	local current_version=${1}
-	local next_version=${2}
-	local deployment_path=${3}
-
-	if [ -d "${deployment_path}" ]; then
-		ls -1 "${deployment_path}" | grep -Fv "${current_version}" | grep -Fv "${next_version}" | head -1 || echo
-	else
-		echo "ERROR: ${deployment_path} is not a valid directory"
-	fi
-}
-
 clean_progress() {
 	local scale=$1
 	local postfix=$2

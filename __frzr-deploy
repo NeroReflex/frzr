@@ -380,56 +380,57 @@ frzr_deploy() {
 				continue
 			fi
 			echo "Done btrfs subvolume set-default"
+			
 			# After the new image has been deployed and is bootable
 			# delete old deployments under these conditions:
-			# - we are currently running inside a frzr deployment (i.e. not during install)
+			# - the current deployment is known
 			# - the deployment is not currently running
-			# - the deployment is not configured to be run on next boot
-			local current_deployment="this_is_not_a_valid_deployment"
+			# - the deployment is not the installed one
 			if echo "${CURRENT}" | grep -Fqx 'ERROR'; then
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Could not retrieve deployment to keep: ${CURRENT}"
 			else
-				current_deployment="${CURRENT}"
-			fi
+				for deployment_to_be_removed in "${DEPLOY_PATH}"/*; do
+					if [ ! -z "${deployment_to_be_removed}" ] && [ -d "${deployment_to_be_removed}" ]; then
+						if is_btrfs_subvolume "${deployment_to_be_removed}"; then
+							local removal_deployment=$(basename "${deployment_to_be_removed}")
 
-			# delete an old deployment if there is one
-			local deployment_to_be_removed=$(get_deployment_to_delete ${current_deployment} ${NAME} ${DEPLOY_PATH})
-			if [ ! -z "${deployment_to_be_removed}" ]; then
-				# Remove all sub-subvolumes of the deployment and the deployment itself (use "deployments" as grep to avoid deleting something else)
-				if [ -d "${DEPLOY_PATH}/${deployment_to_be_removed}" ]; then
-					TASK_MSG="deleting deployment ${deployment_to_be_removed}"
-					echo "$TASK_MSG"
-					local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${deployment_to_be_removed}")
-					if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
-						TASK_ERROR=1
-						TASK_ERROR_MSG="Could not delete the old deployment '${deployment_to_be_removed}', however the new one '${NAME}' will still boot"
-						STATE="SUCCESS"
-						continue
-					fi
-				else
-					TASK_WARNING=1
-					TASK_WARNING_MSG="Could not find deployment to delete '${deployment_to_be_removed}': searched '${DEPLOY_PATH}/${deployment_to_be_removed}'"
-				fi
+							if (echo "${removal_deployment}" | grep -Fqx "${CURRENT}") || (echo "${removal_deployment}" | grep -Fqx "${NAME}"); then
+								echo "Deployment will be kept: ${removal_deployment}"
+							else
+								TASK_MSG="deleting deployment ${removal_deployment}"
+								echo "$TASK_MSG"
+								local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${removal_deployment}")
+								if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
+									TASK_ERROR=1
+									TASK_ERROR_MSG="Could not delete the old deployment '${removal_deployment}', however the new one '${NAME}' will still boot"
+									STATE="SUCCESS"
+									continue
+								fi
 
-				# Delete deployment boot files taking up space in /efi 
-				if [ -f "${EFI_MOUNT_PATH}/${deployment_to_be_removed}" ]; then
-					TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${deployment_to_be_removed}'"
-					echo "Doing rm -rf ${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
-					rm -rf "${EFI_MOUNT_PATH}/${deployment_to_be_removed}"
-					echo "Done rm -rf"
-				fi
+								# Delete deployment boot files taking up space in /efi 
+								if [ -d "${EFI_MOUNT_PATH}/${removal_deployment}" ]; then
+									TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${removal_deployment}'"
+									echo "Doing rm -rf ${EFI_MOUNT_PATH}/${removal_deployment}"
+									rm -rf "${EFI_MOUNT_PATH}/${removal_deployment}"
+									echo "Done rm -rf"
+								fi
+								
+								# Delete deployment entries (this code is based on the fact that names of entries are generated as they are in prepare_efi_partition)
+								for entry_path in "${EFI_MOUNT_PATH}"/loader/entries/*.conf; do
+									if echo "${entry_path}" | grep -Fqx "${removal_deployment}"; then
+										TASK_MSG="deleting deployment boot entry '${entry_path}'"
+										echo "Doing rm -rf ${entry_path}"
+										rm -f "${entry_path}"
+									fi
+								done
 
-				# Delete deployment entries (this code is based on the fact that names of entries are generated as they are in prepare_efi_partition)
-				for entry_path in "${EFI_MOUNT_PATH}"/loader/entries/frzr*.conf; do
-					if echo "${entry_path}" | grep -Fqx "${NAME}"; then
-						TASK_MSG="deleting deployment boot entry '${entry_path}'"
-						echo "Doing rm -rf ${entry_path}"
-						rm -rf "${entry_path}"
+							fi
+						fi
 					fi
 				done
 			fi
-
+			
 			STATE="SUCCESS"
 			;;
 		"SUCCESS")
