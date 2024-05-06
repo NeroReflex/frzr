@@ -398,7 +398,7 @@ frzr_deploy() {
 							if (echo "${removal_deployment}" | grep -Fqx "${CURRENT}") || (echo "${removal_deployment}" | grep -Fqx "${NAME}"); then
 								echo "Deployment will be kept: ${removal_deployment}"
 							else
-								TASK_MSG="deleting deployment ${removal_deployment}"
+								TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}' nor the installed one '${NAME}'"
 								echo "$TASK_MSG"
 								local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${removal_deployment}")
 								if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
