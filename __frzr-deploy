@@ -77,7 +77,7 @@ frzr_deploy() {
 			# keep only the first param as source
 			FRZR_SOURCE="${FRZR_PARAMS%% *}"
 
-			CURRENT=${frzr-release}
+			CURRENT="$(frzr-release)"
 
 			MOUNT_PATH="/frzr_root"
 
