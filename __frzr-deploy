@@ -76,9 +76,9 @@ frzr_deploy() {
 			TASK_STATE="BEGIN"
 			# keep only the first param as source
 			FRZR_SOURCE="${FRZR_PARAMS%% *}"
-
-			CURRENT="$(frzr-release)"
-
+			if frzr-release > /dev/null; then
+				CURRENT=`frzr-release`
+			fi
 			MOUNT_PATH="/frzr_root"
 
 			# Make sure the frzr_root is mounted during the deployment procedure
