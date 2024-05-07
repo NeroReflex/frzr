@@ -69,7 +69,7 @@ while $RUNNING; do
 		# This state should only be used if the unlock completed without errors
 		#TASK_STATE="SUCCESS"
 
-		echo "frzr deployment ${NAME} unlock succeeded"
+		echo "frzr deployment ${NAME} unlock succeeded, please reboot to use the unlocked deployment"
 
 		RUNNING=false
 		;;

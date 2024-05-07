@@ -141,6 +141,7 @@ arg2=$3
 if [ $function == "help" ]; then
     echo "[Usage]
 frzr deploy [Check for system updates and update the system if available]
+frzr unlock (deployment) [Unlock the specified deployment, or the running one if deployment is not specified]
 frzr kernel [Deploy a custom kernel]
 frzr set-channel [Set the update channel stable/testing/unstable]
 frzr get-channel [Get the update channel currently in use]
@@ -157,6 +158,20 @@ elif [ $function == "deploy" ]; then
 
     #flock -E 255 -n /tmp/frzr.lock "frzr-deploy" "$@"
     source "${BASH_SOURCE%/*}/frzr-deploy" "$@"
+    RESULT=$?
+
+    #if [ $RESULT == 255 ]; then
+    #    echo "ERROR: $(basename $0) is already running"
+    #fi
+
+    exit $RESULT
+elif [ $function == "unlock" ]; then
+    frzr_check_bootenv
+    # We don't want to pass the function parameter to __frzr-unlock
+    shift
+
+    #flock -E 255 -n /tmp/frzr.lock "frzr-deploy" "$@"
+    source "${BASH_SOURCE%/*}/frzr-unlock" "$@"
     RESULT=$?
 
     #if [ $RESULT == 255 ]; then
