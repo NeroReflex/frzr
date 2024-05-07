@@ -116,6 +116,8 @@ while $RUNNING; do
 			continue
 		fi
 
+		echo "${UNLOCK_RESULT}"
+
 		systemctl daemon-reload
 
 		STATE="SUCCESS"

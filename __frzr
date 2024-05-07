@@ -449,10 +449,13 @@ execute_unlock() {
 			# only execute unlock scripts marked for newer frzr versions
 			if [ -z "${error}" ] && [ ! -z $frzr_migration_version ] && [ $frzr_migration_version -gt 0 ]; then
 				if [ "$(type -t post_unlock)" == function ] ; then
+					echo "Running $m"
 					local unlock_script_result=$(post_unlock "${frzr_root}" "${deployment}" "${version}")
 					if echo "${unlock_script_result}" | grep -Fqx "ERROR"; then
 						error="${unlock_script_result}"
 					fi
+				else
+					echo "$m has no post_unlock"
 				fi
 			fi
 
