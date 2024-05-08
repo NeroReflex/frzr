@@ -425,11 +425,26 @@ frzr_deploy() {
 			echo "Done frzr_sdboot"
 			# Remove download artifacts (if any)
 			rm -f ${MOUNT_PATH}/*.img.*
-			echo "Doing btrfs subvolume set-default $subvolid ${MOUNT_PATH}"
+
+			# Get the subvolid: this will be used in generating the systemd-boot entry and setting is as the default for the automatic boot
+			TASK_MSG="Finding deployment subvolume ID"
+			local rootfs_subvolid=$(btrfs_subvol_get_id "$SUBVOL")
+			if echo "$subvolid" | grep -Fqx "ERROR"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
+				STATE="FAIL"
+				continue
+            elif [ "${rootfs_subvolid}" = "5" ]; then
+                TASK_ERROR_MSG="Could not identify the correct subvolid of the running deployment"
+				STATE="FAIL"
+				continue
+			fi
+
+			echo "Doing btrfs subvolume set-default $subvolid /"
 			# Activates the new deployed image by making it the default btrfs subvolume
 			# systemd-equipped initramfs images will automount the default subvolume as the rootfs
 			TASK_MSG="Activating the new deployment (subvolid=${subvolid}) as the default subvolume"
-			if ! btrfs subvolume set-default "$subvolid" "${MOUNT_PATH}"; then
+			if ! btrfs subvolume set-default "$subvolid" "/"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not activate the new deployment"
 				STATE="FAIL"
