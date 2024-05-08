@@ -412,9 +412,9 @@ frzr_deploy() {
 		"CLEANUP")
 			TASK_STATE="CLEANUP"
 			# Delete the downloaded system img etc.
-			echo "Doing frzr-sdboot '${NAME}'"
+			echo "Doing frzr-bootloader '${NAME}'"
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-			local efi_update_result=$(frzr-sdboot "${NAME}")
+			local efi_update_result=$(frzr-bootloader "${NAME}")
 			if echo "${efi_update_result}" | grep -q 'ERROR'; then
 				# bootloader configuration could not be updated
 				TASK_ERROR=1

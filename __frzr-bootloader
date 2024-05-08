@@ -3,7 +3,7 @@
 # import methods
 source "${BASH_SOURCE%/*}/__frzr" "$@"
 
-frzr_sdboot() {
+frzr_bootloader() {
     NAME=${1}
 
     # by default the deployment is the running one
@@ -159,7 +159,7 @@ frzr_sdboot() {
 			# This state should only be used if the unlock completed without errors
 			#TASK_STATE="SUCCESS"
 
-			echo "systemd-boot configuration update success"
+			echo "bootloader configuration update success"
 
 			RUNNING=false
 			;;
@@ -168,7 +168,7 @@ frzr_sdboot() {
 
 			#TASK_STATE="FAIL"
 
-			echo "ERROR: frzr-sdboot failed: ${TASK_ERROR_MSG}"
+			echo "ERROR: frzr-bootloader failed: ${TASK_ERROR_MSG}"
 
 			RUNNING=false
 			;;
