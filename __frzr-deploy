@@ -440,11 +440,11 @@ frzr_deploy() {
 				continue
 			fi
 
-			echo "Doing btrfs subvolume set-default ${subvolid} /"
+			echo "Doing btrfs subvolume set-default \"${subvolid}\" \"${MOUNT_PATH}\""
 			# Activates the new deployed image by making it the default btrfs subvolume
 			# systemd-equipped initramfs images will automount the default subvolume as the rootfs
 			TASK_MSG="Activating the new deployment (subvolid=${subvolid}) as the default subvolume"
-			if ! btrfs subvolume set-default "${subvolid}" "/"; then
+			if ! btrfs subvolume set-default "${subvolid}" "${MOUNT_PATH}"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not activate the new deployment"
 				STATE="FAIL"
