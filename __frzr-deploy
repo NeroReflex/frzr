@@ -159,13 +159,6 @@ frzr_deploy() {
 							else
 								TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}'"
 								echo "$TASK_MSG"
-								local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${removal_deployment}")
-								if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
-									TASK_ERROR=1
-									TASK_ERROR_MSG="Could not delete the old deployment '${removal_deployment}'"
-									STATE="FAIL"
-									continue
-								fi
 
 								# Delete deployment boot files taking up space in /efi 
 								if [ -d "${EFI_MOUNT_PATH}/${removal_deployment}" ]; then
@@ -184,6 +177,24 @@ frzr_deploy() {
 									fi
 								done
 
+								# Execute deployment removal scripts
+								TASK_MSG="Executing removal hooks"
+								local deployment_removal_hooks=$(execute_removal "${removal_deployment}" "${deployment_to_be_removed}" "${MOUNT_PATH}")
+								if echo "${deployment_removal_hooks}" | grep -Fqx "ERROR"; then
+									TASK_ERROR=1
+									TASK_ERROR_MSG="Removal hook on subvolume '${deployment_to_be_removed}' failed: ${deployment_removal_hooks}"
+									STATE="FAIL"
+									continue
+								fi
+
+								# Delete the deployment btrfs subvolume
+								local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${removal_deployment}")
+								if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
+									TASK_ERROR=1
+									TASK_ERROR_MSG="Could not delete the old deployment '${removal_deployment}'"
+									STATE="FAIL"
+									continue
+								fi
 							fi
 						fi
 					fi

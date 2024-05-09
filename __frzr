@@ -455,11 +455,66 @@ execute_unlock() {
 						error="${unlock_script_result}"
 					fi
 				else
-					echo "$m has no post_unlock"
+					echo "$m has no post_unlock function"
 				fi
 			fi
 
 			unset -f post_unlock
+
+			unset frzr_migration_version
+		done
+	fi
+
+	if [ -z "${error}" ]; then
+		echo "OK"
+	else
+		echo "${error}"
+	fi
+}
+
+# Check if there are removal scripts available in the image to be removed and run them one by one
+# Note: removal scripts are functions named pre_removal inside (executable) files with .removal extension
+# stored inside $2/usr/lib/frzr.d/
+#
+# Every pre_removal function will be run in a subshell.
+#
+# PRE=$2/usr/lib/frzr.d is a directory
+# POST=
+#
+# $1 the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
+# $2 the deployment subvolume
+# $3 frzr_root the mounted path to the main btrfs subvolume (the one that contains home as a subvolume)
+# stdout "OK" on success, the error otherwise
+execute_removal() {
+	local version=$1
+	local deployment=$2
+	local frzr_root=$3
+
+	local error=""
+
+	if compgen -G "${deployment}"/usr/lib/frzr.d/*.removal >/dev/null; then
+		for m in "${deployment}"/usr/lib/frzr.d/*.removal; do
+			unset frzr_migration_version
+
+			unset -f pre_removal
+
+			# source the migration
+			. $m
+
+			# only execute unlock scripts marked for newer frzr versions
+			if [ -z "${error}" ] && [ ! -z "${frzr_migration_version}" ] && [ $frzr_migration_version -gt 0 ]; then
+				if [ "$(type -t pre_removal)" == function ] ; then
+					echo "Running $m"
+					local unlock_script_result=$(pre_removal "${frzr_root}" "${deployment}" "${version}")
+					if echo "${unlock_script_result}" | grep -Fqx "ERROR"; then
+						error="${unlock_script_result}"
+					fi
+				else
+					echo "$m has no pre_removal function"
+				fi
+			fi
+
+			unset -f pre_removal
 
 			unset frzr_migration_version
 		done
