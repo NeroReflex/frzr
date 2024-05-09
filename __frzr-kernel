@@ -78,10 +78,12 @@ kernel() {
 			# Fetch the name of the kernel (uname -r)
 			KERNEL_NAME=$(make -s kernelrelease)
 
+			echo "Building ${KERNEL_NAME}..."
+
 			# TODO: multicore?
 			if ! make all; then
 				TASK_ERROR=1
-				TASK_ERROR_MSG="ERROR: missing .config file"
+				TASK_ERROR_MSG="ERROR: Compilation of linux-${KERNEL_NAME} failed"
 				STATE="FAIL"
 				continue
 			fi
