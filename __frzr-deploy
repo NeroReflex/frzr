@@ -503,28 +503,28 @@ frzr_deploy() {
 			;;
 		esac
 	done
-	echo "1"
+
 	# umount the subvol /home bind-mount
 	if [ ! -z "$SUBVOL_HOME_MOUNT" ]; then
 		if mountpoint -q "${SUBVOL_HOME_MOUNT}"; then
 			umount -l "${SUBVOL_HOME_MOUNT}"
 		fi
 	fi
-	echo "2"
+
 	# umount the subvol /efi bind-mount
 	if [ ! -z "$SUBVOL_EFI_MOUNT" ]; then
 		if mountpoint -q "${SUBVOL_EFI_MOUNT}"; then
 			umount -l "${SUBVOL_EFI_MOUNT}"
 		fi
 	fi
-	echo "3"
+
 	# umount the efi path
 	if [ "${MOUNTED_EFI_MOUNT_PATH}" = "yes" ]; then
 		if mountpoint -q "${EFI_MOUNT_PATH}"; then
 			umount -l "${EFI_MOUNT_PATH}"
 		fi
 	fi
-	echo "4"
+
 	# umount the frzr_root subvolume (if it was mounted by this tool and not externally)
 	if [ "${MOUNTED_MOUNT_PATH}" = "yes" ]; then
 		if mountpoint -q "${MOUNT_PATH}"; then
