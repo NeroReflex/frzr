@@ -96,7 +96,25 @@ frzr_bootloader() {
                 fi
             fi
 
-            STATE="CONFIGURE"
+            STATE="BOOTLOADER"
+            ;;
+
+		"BOOTLOADER")
+
+			# Check if a (supported) bootloader is present and if not install it
+
+			# Install systemd-boot as the bootloader
+			if [ ! -f "${EFI_MOUNT_PATH}/EFI/systemd/systemd-bootx64.efi" ]; then
+				TASK_MSG="Installing systemd-boot to '${EFI_MOUNT_PATH}' as the bootloader"
+				if ! bootctl --esp-path="${EFI_MOUNT_PATH}/" install; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not install systemd-boot to '${EFI_MOUNT_PATH}'"
+					STATE="FAIL"
+					continue
+				fi
+			fi
+
+			STATE="CONFIGURE"
             ;;
 
 		"CONFIGURE")
@@ -124,7 +142,7 @@ frzr_bootloader() {
 				continue
 			fi
 
-			# Read additional boot arguments (to be added to the kernel cmdline) from the deployment image
+			# Read additional boot arguments (to be added to the kernel cmdline) from the deployed image
 			local additional_arguments=""
 			if [ -f "${SUBVOL}/usr/lib/frzr.d/bootconfig.conf" ]; then
 				local bootconf_args=$(cat "${SUBVOL}/usr/lib/frzr.d/bootconfig.conf") 
@@ -132,6 +150,16 @@ frzr_bootloader() {
 			else
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Could not read '${SUBVOL}/usr/lib/frzr.d/bootconfig.conf': default kernel cmdline will be used"
+			fi
+
+			# Read additional boot arguments (to be added to the kernel cmdline) from the user file
+			local additional_arguments=""
+			if [ -f "${EFI_MOUNT_PATH}/frzr_bootconfig.conf" ]; then
+				local user_bootconf_args=$(cat "${EFI_MOUNT_PATH}/frzr_bootconfig.conf") 
+				additional_arguments="$additional_arguments ${user_bootconf_args}"
+			else
+				TASK_WARNING=1
+				TASK_WARNING_MSG="Could not read '${EFI_MOUNT_PATH}/frzr_bootconfig.conf': deployment cmdline will be used"
 			fi
 
 			# Make sure the deployment has a /boot directory

@@ -68,9 +68,6 @@ repair_install() {
 		# remove everything from the EFI partition
 		rm -rf "${frzr_root}"/efi/*
 
-		# reinstall the bootloader
-		bootctl --esp-path="${frzr_root}/efi/" install
-
 		# Delete every installed system
 		if [ -d "${frzr_root}"/deployments ]; then
 			echo "deleting subvolume(s)..."
@@ -180,18 +177,21 @@ fresh_install() {
 	mkdir -p "${frzr_root}/efi"
 	mkdir -p "${frzr_root}/.etc"
 
-	# setup boot partition & install bootloader
+	# setup boot partition (the bootloader will be installed by frzr-bootloader utility)
 	local efi_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*1$")
 	mkfs.vfat "${efi_part}"
 	dosfslabel "${efi_part}" frzr_efi
 	mount -t vfat "${efi_part}" "${frzr_root}/efi/"
-	bootctl --esp-path=${frzr_root}/efi/ install
 
 	# setup the swap partition
 	if [[ $SWAP_PART_NUMBER -ne 0 ]]; then
 		local swap_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${SWAP_PART_NUMBER}$")
 		mkswap "${swap_part}"
 		local swap_uuid=$(blkid -s UUID -o value "${swap_part}")
+		local swap_partuuid=$(blkid -s PARTUUID -o value "${swap_part}")
+		if [ ! -z "$swap_uuid" ]; then
+			echo "resume=PARTUUID=${swap_partuuid}" > "${frzr_root}/efi//frzr_bootconfig.conf"
+		fi
 		#echo "${swap_uuid}" > "${frzr_root}/swap_uuid"
 		swapon "${swap_part}" # activate swap for the installer
 	fi	
