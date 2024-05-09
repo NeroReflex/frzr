@@ -71,7 +71,7 @@ while $RUNNING; do
 		fi
 
 		if mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
-			STATE="UNLOCK"
+			STATE="RELEASE_CHECK"
 		else
 			echo "frzr-unlock failed: could not mount frzr_root"
 			STATE="FAIL"

@@ -447,7 +447,7 @@ execute_unlock() {
 			. $m
 
 			# only execute unlock scripts marked for newer frzr versions
-			if [ ! -z "${error}" ] && [ ! -z "${frzr_migration_version}" ] && [ $frzr_migration_version -gt 0 ]; then
+			if [ -z "${error}" ] && [ ! -z "${frzr_migration_version}" ] && [ $frzr_migration_version -gt 0 ]; then
 				if [ "$(type -t post_unlock)" == function ] ; then
 					echo "Running $m"
 					local unlock_script_result=$(post_unlock "${frzr_root}" "${deployment}" "${version}")
