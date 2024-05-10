@@ -287,6 +287,7 @@ while $RUNNING; do
 	"FORMAT")
 		echo "We are doing a fresh install"
 		TASK_MSG="We are doing a fresh install"
+		send_data
 
 		USERNAME=user
 
@@ -303,9 +304,11 @@ while $RUNNING; do
 		if [ $RESULT -eq 0 ]; then
 			TASK_MSG="Bootstrap succeededd"
 			STATE="SUCCESS"
+			send_data
 		else
 			TASK_MSG="Bootstrap failed"
 			STATE="FAIL"
+			send_data
 			continue
 		fi
 		;;
@@ -322,6 +325,7 @@ while $RUNNING; do
 	"SUCCESS")
 		echo "Successfully prepared the drive for an FRZR installation"
 		TASK_MSG="Successfully prepared the drive for an FRZR installation"
+		send_data
 		RUNNING=false
 		;;
 	"FAIL")

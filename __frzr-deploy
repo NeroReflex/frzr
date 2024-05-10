@@ -31,19 +31,23 @@ frzr_deploy() {
 		"FRZR_DEPLOY_CHECK")
 			TASK_STATE="CHECK"
 			TASK_MSG="Checking for root privileges"
+			send_data
 			if [ $EUID -ne 0 ]; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="$(basename $0) not run as root"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 
 			TASK_MSG="Checking is system has booted via UEFI"
+			send_data
 			check_uefi_result=$(check_uefi)
 			if echo "${check_uefi_result}" | grep -Fqx 'ERROR'; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="UEFI boot check failed: ${check_uefi_result}"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 			
@@ -62,6 +66,7 @@ frzr_deploy() {
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Unknown argument $1"
 					STATE="FAIL"
+					send_data
 					;;
 				*)                               # preserve positional arguments
 					FRZR_PARAMS="${FRZR_PARAMS}$1 " # Use trailing space for the match below
@@ -80,7 +85,7 @@ frzr_deploy() {
 			;;
 		"BEGIN")
 			TASK_STATE="BEGIN"
-			
+			send_data
 			MOUNT_PATH="/frzr_root"
 
 			# Make sure the frzr_root is mounted during the deployment procedure
@@ -90,6 +95,7 @@ frzr_deploy() {
 			if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
 				MOUNT_PATH="/tmp/frzr_root"
 				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
+				send_data
 				mkdir -p ${MOUNT_PATH}
 				if mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"; then
 					MOUNTED_MOUNT_PATH="yes"
@@ -101,6 +107,7 @@ frzr_deploy() {
 				DEPLOY_PATH="${MOUNT_PATH}/deployments"
 				
 				TASK_MSG="Preparing '${DEPLOY_PATH}' to be used as the deployment destination path"
+				send_data
 
 				# Make sure DEPLOY_PATH exists
 				mkdir -p "${DEPLOY_PATH}"
@@ -108,6 +115,7 @@ frzr_deploy() {
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Could not create ${DEPLOY_PATH} to to store deployments"
 					STATE="FAIL"
+					send_data
 					continue
 				fi
 
@@ -115,6 +123,7 @@ frzr_deploy() {
 				EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
 
 				TASK_MSG="Preparing '${EFI_MOUNT_PATH}' to be used as the EFI System path"
+				send_data
 
 				if ! mountpoint -q "${EFI_MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
 					mkdir -p "${EFI_MOUNT_PATH}"
@@ -131,16 +140,18 @@ frzr_deploy() {
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Could not bind ${EFI_MOUNT_PATH} to frzr_efi (boot) partition"
 					STATE="FAIL"
+					send_data
 				fi
 			else
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not bind ${MOUNT_PATH} to frzr_root main subvolume"
 				STATE="FAIL"
+				send_data
 			fi
 			;;
 		"PREPARE")
 			TASK_STATE="PREPARE"
-
+			send_data
 			# Before the new image is deployed
 			# delete old deployments under these conditions:
 			# - the current deployment is known
@@ -148,6 +159,7 @@ frzr_deploy() {
 			if echo "${CURRENT}" | grep -Fqx 'ERROR'; then
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Could not retrieve deployment to keep: ${CURRENT}"
+				send_data
 			else
 				for deployment_to_be_removed in "${DEPLOY_PATH}"/*; do
 					if [ ! -z "${deployment_to_be_removed}" ] && [ -d "${deployment_to_be_removed}" ]; then
@@ -158,11 +170,13 @@ frzr_deploy() {
 								echo "Deployment will be kept: ${removal_deployment}"
 							else
 								TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}'"
+								send_data
 								echo "$TASK_MSG"
 
 								# Delete deployment boot files taking up space in /efi 
 								if [ -d "${EFI_MOUNT_PATH}/${removal_deployment}" ]; then
 									TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${removal_deployment}'"
+									send_data
 									echo "Doing rm -rf ${EFI_MOUNT_PATH}/${removal_deployment}"
 									rm -rf "${EFI_MOUNT_PATH}/${removal_deployment}"
 									echo "Done rm -rf"
@@ -172,6 +186,7 @@ frzr_deploy() {
 								for entry_path in "${EFI_MOUNT_PATH}"/loader/entries/*.conf; do
 									if echo "${entry_path}" | grep -Fqx "${removal_deployment}"; then
 										TASK_MSG="deleting deployment boot entry '${entry_path}'"
+										send_data
 										echo "Doing rm -rf ${entry_path}"
 										rm -f "${entry_path}"
 									fi
@@ -179,11 +194,13 @@ frzr_deploy() {
 
 								# Execute deployment removal scripts
 								TASK_MSG="Executing removal hooks"
+								send_data
 								local deployment_removal_hooks=$(execute_removal "${removal_deployment}" "${deployment_to_be_removed}" "${MOUNT_PATH}")
 								if echo "${deployment_removal_hooks}" | grep -Fqx "ERROR"; then
 									TASK_ERROR=1
 									TASK_ERROR_MSG="Removal hook on subvolume '${deployment_to_be_removed}' failed: ${deployment_removal_hooks}"
 									STATE="FAIL"
+									send_data
 									continue
 								fi
 
@@ -193,6 +210,7 @@ frzr_deploy() {
 									TASK_ERROR=1
 									TASK_ERROR_MSG="Could not delete the old deployment '${removal_deployment}'"
 									STATE="FAIL"
+									send_data
 									continue
 								fi
 							fi
@@ -205,6 +223,7 @@ frzr_deploy() {
 			;;
 		"DOWNLOAD")
 			TASK_STATE="DOWNLOAD"
+			send_data
 			# Check if source needs updated or needs to be created for the first time
 			if [ ! -z "$FRZR_SOURCE" ] && [ "$FRZR_SOURCE" != " " ] && [ $FRZR_CHECK_UPDATE -eq 0 ] && [ $FRZR_STEAM_PROGRESS -eq 0 ]; then
 				echo "$FRZR_SOURCE" >"${MOUNT_PATH}/source"
@@ -275,6 +294,7 @@ frzr_deploy() {
 						TASK_ERROR=1
 						TASK_ERROR_MSG="${NAME} is already installed"
 						STATE="FAIL"
+						send_data
 						continue
 					fi
 				fi
@@ -301,6 +321,7 @@ frzr_deploy() {
 		"CHECKSUM")
 			TASK_STATE="CHECKSUM"
 			TASK_MSG="Verying checksums match"
+			send_data
 			ACTUAL_CHECKSUM=$(sha256sum "${IMG_FILE}" | cut -d' ' -f 1)
 			if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
 				rm -f "${IMG_FILE}"
@@ -309,14 +330,17 @@ frzr_deploy() {
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Checksum does not match"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 			TASK_TRACKER=1 # Tell any listeners this task was completed, I'm not sure this variable will be needed in the end
+			send_data
 			echo "Entering Extract Case"
 			STATE="EXTRACT"
 			;;
 		"EXTRACT")
 			TASK_STATE="EXTRACT"
+			send_data
 			# Extract tar of system image
 			# This step might not ever need to be used, but left here depending on the occasion it may be needed.
 
@@ -339,11 +363,13 @@ frzr_deploy() {
 
 			# Install the deployment from the downloaded file $IMG_FILE and place the deployed image in $DEPLOY_PATH
 			TASK_MSG="Installing the downloaded deployment"
+			send_data
 			local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
 			if echo "${install_result}" | grep -Fqx 'ERROR'; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Error extracting the deployment image: ${install_result}"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 
@@ -351,6 +377,7 @@ frzr_deploy() {
 			;;
 		"INSTALL")
 			TASK_STATE="INSTALL"
+			send_data
 
 			# mount home into the new deployment
 			if [ -d "${SUBVOL}/home" ]; then
@@ -362,6 +389,7 @@ frzr_deploy() {
 				else
 					TASK_WARNING=1
 					TASK_WARNING_MSG="Could not mount /home directory"
+					send_data
 				fi
 			fi
 
@@ -373,6 +401,7 @@ frzr_deploy() {
 				else
 					TASK_WARNING=1
 					TASK_WARNING_MSG="Could not mount ESP partition because image does not have a /efi directory"
+					send_data
 				fi
 			fi
 
@@ -384,11 +413,13 @@ frzr_deploy() {
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Migrations on subvolume '$SUBVOL' failed: ${migrations_result}"
 					STATE="FAIL"
+					send_data
 					continue
 				fi
 			else
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Could not find migrations scripts inside the deployed image"
+				send_data
 			fi
 
 			STATE="VERIFY"
@@ -398,11 +429,13 @@ frzr_deploy() {
 
 			# verify the subvolume integrity
 			TASK_MSG="Checking integrity of deployed image"
+			send_data
 			if [ -z "$FRZR_SKIP_CHECK" ]; then
 				if ! btrfs scrub start -Bdr "${SUBVOL}"; then
 					TASK_ERROR=1
 					TASK_ERROR_MSG="FS check on btrfs subvolume '$SUBVOL' failed: image integrity compromised"
 					STATE="FAIL"
+					send_data
 				fi
 			fi
 
@@ -422,6 +455,7 @@ frzr_deploy() {
 			;;
 		"CLEANUP")
 			TASK_STATE="CLEANUP"
+			send_data
 			# Delete the downloaded system img etc.
 			echo "Doing frzr-bootloader '${NAME}'"
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
@@ -431,6 +465,7 @@ frzr_deploy() {
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not update the EFI partition: ${efi_update_result}"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 			echo "Done frzr_sdboot"
@@ -439,19 +474,23 @@ frzr_deploy() {
 
 			# Get the subvolid: this will be used in generating the systemd-boot entry and setting is as the default for the automatic boot
 			TASK_MSG="Finding deployment subvolume ID"
+			send_data
 			local subvolid=$(btrfs_subvol_get_id "$SUBVOL")
 			if echo "$subvolid" | grep -Fqx "ERROR"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
 				STATE="FAIL"
+				send_data
 				continue
             elif [ "${subvolid}" = "5" ]; then
                 TASK_ERROR_MSG="Invalid deployment subvolid"
 				STATE="FAIL"
+				send_data
 				continue
 			elif [ -z "${subvolid}" ]; then
 				TASK_ERROR_MSG="Could not identify the correct subvolid of the deployment"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 
@@ -459,10 +498,12 @@ frzr_deploy() {
 			# Activates the new deployed image by making it the default btrfs subvolume
 			# systemd-equipped initramfs images will automount the default subvolume as the rootfs
 			TASK_MSG="Activating the new deployment (subvolid=${subvolid}) as the default subvolume"
+			send_data
 			if ! btrfs subvolume set-default "${subvolid}" "${MOUNT_PATH}"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not activate the new deployment"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 			echo "Done btrfs subvolume set-default"
@@ -475,6 +516,7 @@ frzr_deploy() {
 			TASK_STATE="SUCCESS"
 
 			TASK_MSG="Deployment is successful: reboot to boot into ${NAME}"
+			send_data
 
 			RUNNING=false
 			;;
@@ -494,6 +536,7 @@ frzr_deploy() {
 			#fi
 
 			TASK_STATE="FAIL"
+			send_data
 			RUNNING=false
 			;;
 		*)

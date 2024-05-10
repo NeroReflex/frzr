@@ -101,18 +101,10 @@ frzr_check() {
     echo $value
 }
 
-ENABLE_TRACKER_WRITE=true
 write_tracker_file() {
-    while $ENABLE_TRACKER_WRITE; do
 	frzr_status >"$TRACKER_FILE_DIR/frzr.tracker"
-	sleep 1
-    done
 }
 
-# Write the tracker file in the background
-write_tracker_file &
-tracker_pid="$!"
-echo "Started tracker: PID: $tracker_pid"
 # Write tracker file when frzr exits
 #trap write_tracker_file SIGINT SIGTERM EXIT ERR
 # Define a function to handle errors
@@ -163,9 +155,6 @@ frzr bootstrap [Format and configure a drive to be used with FRZR]"
 elif [ $function == "bootstrap" ]; then
     source frzr-bootstrap $arg1 $arg2 $arg3 # username, disk, clean/repair install
     RESULT=$?
-    # Stop the tracker process
-    kill -9 "$tracker_pid"
-    ENABLE_TRACKER_WRITE=false
     exit $RESULT
 elif [ $function == "deploy" ]; then
     frzr_check_bootenv
@@ -179,8 +168,6 @@ elif [ $function == "deploy" ]; then
     #if [ $RESULT == 255 ]; then
     #    echo "ERROR: $(basename $0) is already running"
     #fi
-    kill -9 "$tracker_pid"
-    ENABLE_TRACKER_WRITE=false
     exit $RESULT
 elif [ $function == "unlock" ]; then
     frzr_check_bootenv
