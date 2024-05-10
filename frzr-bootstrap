@@ -240,7 +240,15 @@ if [ $EUID -ne 0 ]; then
 fi
 
 RUNNING=true
-STATE="FRZR_BOOTSTRAP_CHECK"
+
+# Check for the GUI installer
+if [ -n "$1" ] && [ -n "$2" ]; then
+    STATE="FORMAT"
+    MOUNT_PATH=/tmp/frzr_root
+else
+    STATE="FRZR_BOOTSTRAP_CHECK"
+fi
+
 
 while $RUNNING; do
 	case "$STATE" in
@@ -278,6 +286,7 @@ while $RUNNING; do
 		;;
 	"FORMAT")
 		echo "We are doing a fresh install"
+		TASK_MSG="We are doing a fresh install"
 
 		USERNAME=user
 
@@ -285,11 +294,17 @@ while $RUNNING; do
 			USERNAME=$1
 		fi
 
+		if [ ! -z $2 ]; then
+			DISK=$2
+		fi
+
 		fresh_install "${DISK}" "${MOUNT_PATH}"
 		RESULT=$?
 		if [ $RESULT -eq 0 ]; then
+			TASK_MSG="Bootstrap succeededd"
 			STATE="SUCCESS"
 		else
+			TASK_MSG="Bootstrap failed"
 			STATE="FAIL"
 			continue
 		fi
@@ -306,14 +321,17 @@ while $RUNNING; do
 		;;
 	"SUCCESS")
 		echo "Successfully prepared the drive for an FRZR installation"
+		TASK_MSG="Successfully prepared the drive for an FRZR installation"
 		RUNNING=false
 		;;
 	"FAIL")
 		echo "The bootstrap failed"
+		TASK_ERROR=1
 		RUNNING=false
 		;;
 	*)
 		echo "Something went terribly wrong"
+		TASK_ERROR=1
 		RUNNING=false
 		;;
 	esac

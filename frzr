@@ -19,6 +19,7 @@ TASK_ERROR=0        # Signal to let listeners know that the task had an error.
 TASK_ERROR_MSG=""   # Error message. EX: "Unexpected I/O errors found during write"
 TASK_WARNING=0      # Signal to let listeners know there is a warning
 TASK_WARNING_MSG="" # Warning message. EX: "BTRFS filesystem was supposed to be locked, but it was already unlocked. Continuing.."
+TASK_PROGRESS=0     # Use this whenever we want to send progress to the GUI in the form of whole number percentages
 
 frzr_check_bootenv() {
     if [ -d /tmp/frzr_root ]; then
@@ -57,9 +58,10 @@ frzr_status() {
         "Task MSG": "$TASK_MSG",
         "Task Tracker": "$TASK_TRACKER",
         "Task Error": "$TASK_ERROR",
-        "Task Error Message": "$TASK_ERROR_MSG",
+        "Task Error MSG": "$TASK_ERROR_MSG",
         "Task Warning": "$TASK_WARNING",
-        "Task Warning Message": "$TASK_WARNING_MSG",
+        "Task Warning MSG": "$TASK_WARNING_MSG",
+        "Task Progress": "$TASK_PROGRESS",
     },
     "Globals": {
         "Target": "$TARGET",
@@ -99,12 +101,20 @@ frzr_check() {
     echo $value
 }
 
+ENABLE_TRACKER_WRITE=true
 write_tracker_file() {
-    frzr_status >"$TRACKER_FILE_DIR/frzr.tracker"
+    while $ENABLE_TRACKER_WRITE; do
+	frzr_status >"$TRACKER_FILE_DIR/frzr.tracker"
+	sleep 1
+    done
 }
 
+# Write the tracker file in the background
+write_tracker_file &
+tracker_pid="$!"
+echo "Started tracker: PID: $tracker_pid"
 # Write tracker file when frzr exits
-trap write_tracker_file SIGINT SIGTERM EXIT ERR
+#trap write_tracker_file SIGINT SIGTERM EXIT ERR
 # Define a function to handle errors
 handle_error() {
     local function_name="$1"
@@ -137,6 +147,7 @@ fi
 function=$1
 arg1=$2
 arg2=$3
+arg3=$4
 
 if [ $function == "help" ]; then
     echo "[Usage]
@@ -150,7 +161,12 @@ frzr build-initramfs [Build the initramfs for the kernel]
 frzr configure-tweaks [Configure system specific quirks]
 frzr bootstrap [Format and configure a drive to be used with FRZR]"
 elif [ $function == "bootstrap" ]; then
-    source frzr-bootstrap $arg1
+    source frzr-bootstrap $arg1 $arg2 $arg3 # username, disk, clean/repair install
+    RESULT=$?
+    # Stop the tracker process
+    kill -9 "$tracker_pid"
+    ENABLE_TRACKER_WRITE=false
+    exit $RESULT
 elif [ $function == "deploy" ]; then
     frzr_check_bootenv
     # We don't want to pass the function parameter to __frzr-deploy
@@ -163,7 +179,8 @@ elif [ $function == "deploy" ]; then
     #if [ $RESULT == 255 ]; then
     #    echo "ERROR: $(basename $0) is already running"
     #fi
-
+    kill -9 "$tracker_pid"
+    ENABLE_TRACKER_WRITE=false
     exit $RESULT
 elif [ $function == "unlock" ]; then
     frzr_check_bootenv
