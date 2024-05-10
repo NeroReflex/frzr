@@ -101,8 +101,9 @@ frzr_check() {
     echo $value
 }
 
+ENABLE_TRACKER_WRITE=true
 write_tracker_file() {
-    while true; do
+    while $ENABLE_TRACKER_WRITE; do
 	frzr_status >"$TRACKER_FILE_DIR/frzr.tracker"
 	sleep 1
     done
@@ -163,6 +164,7 @@ elif [ $function == "bootstrap" ]; then
     RESULT=$?
     # Stop the tracker process
     kill -9 "$tracker_pid"
+    ENABLE_TRACKER_WRITE=false
     exit $RESULT
 elif [ $function == "deploy" ]; then
     frzr_check_bootenv
@@ -177,6 +179,7 @@ elif [ $function == "deploy" ]; then
     #    echo "ERROR: $(basename $0) is already running"
     #fi
     kill -9 "$tracker_pid"
+    ENABLE_TRACKER_WRITE=false
     exit $RESULT
 elif [ $function == "unlock" ]; then
     frzr_check_bootenv
