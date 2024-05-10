@@ -57,9 +57,9 @@ frzr_status() {
         "Task MSG": "$TASK_MSG",
         "Task Tracker": "$TASK_TRACKER",
         "Task Error": "$TASK_ERROR",
-        "Task Error Message": "$TASK_ERROR_MSG",
+        "Task Error MSG": "$TASK_ERROR_MSG",
         "Task Warning": "$TASK_WARNING",
-        "Task Warning Message": "$TASK_WARNING_MSG",
+        "Task Warning MSG": "$TASK_WARNING_MSG",
     },
     "Globals": {
         "Target": "$TARGET",
