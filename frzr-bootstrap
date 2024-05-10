@@ -242,8 +242,9 @@ fi
 RUNNING=true
 
 # Check for the GUI installer
-if [ -z "$1" ] && [ -z "$2" ]; then
+if [ -n "$1" ] && [ -n "$2" ]; then
     STATE="FORMAT"
+    MOUNT_PATH=/tmp/frzr_root
 else
     STATE="FRZR_BOOTSTRAP_CHECK"
 fi
