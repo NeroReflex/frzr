@@ -112,8 +112,9 @@ write_tracker_file() {
 # Write the tracker file in the background
 write_tracker_file &
 tracker_pid="$!"
+echo "Started tracker: PID: $tracker_pid"
 # Write tracker file when frzr exits
-trap write_tracker_file SIGINT SIGTERM EXIT ERR
+#trap write_tracker_file SIGINT SIGTERM EXIT ERR
 # Define a function to handle errors
 handle_error() {
     local function_name="$1"
