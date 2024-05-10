@@ -26,6 +26,7 @@ frzr_deploy() {
 
 	local RUNNING=true
 	STATE="FRZR_DEPLOY_CHECK"
+	TASK_TRACKER=0
 	while $RUNNING; do
 		case "$STATE" in
 		"FRZR_DEPLOY_CHECK")
@@ -529,6 +530,7 @@ frzr_deploy() {
 			TASK_STATE="SUCCESS"
 
 			TASK_MSG="Deployment is successful: reboot to boot into ${NAME}"
+			TASK_TRACKER=1
 			send_data
 
 			RUNNING=false
@@ -547,13 +549,16 @@ frzr_deploy() {
 			#		fi
 			#	fi
 			#fi
-
 			TASK_STATE="FAIL"
+			TASK_ERROR=1
 			send_data
 			RUNNING=false
 			;;
 		*)
 			TASK_STATE="UNKNOWN_ERROR"
+			TASK_ERROR_MSG="Deploy hit an unexpected state"
+			TASK_ERROR=1
+			send_data
 			echo "ERROR: Something went terribly wrong in $(basename $0)"
 			RUNNING=false
 			;;
