@@ -242,7 +242,7 @@ fi
 RUNNING=true
 
 # Check for the GUI installer
-if [ -z "$1" ] && [ "$1" != "gamer" ]; then
+if [ -z "$1" ] && [ -z "$2" ]; then
     STATE="FORMAT"
 else
     STATE="FRZR_BOOTSTRAP_CHECK"
