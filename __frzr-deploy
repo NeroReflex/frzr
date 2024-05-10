@@ -316,9 +316,13 @@ frzr_deploy() {
 					curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
 						stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 91 %
 				elif [ -z ${SHOW_UI} ]; then
+					TASK_MSG="SHOW_UI is not set"
+					send_data
 					echo "downloading ${NAME}"
 					curl --http1.1 -L -o "${IMG_FILE}" -C - "${IMG_URL}"
 				else
+					TASK_MSG="Using Whiptail to show download progress"
+					send_data
 					curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
 						stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 100 |
 						whiptail --gauge "Downloading system image (${NAME})" 10 50 0
