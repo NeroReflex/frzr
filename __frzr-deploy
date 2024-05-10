@@ -223,18 +223,21 @@ frzr_deploy() {
 			;;
 		"DOWNLOAD")
 			TASK_STATE="DOWNLOAD"
+			TASK_MSG="Check if source needs updated or needs to be created for the first time"
 			send_data
 			# Check if source needs updated or needs to be created for the first time
 			if [ ! -z "$FRZR_SOURCE" ] && [ "$FRZR_SOURCE" != " " ] && [ $FRZR_CHECK_UPDATE -eq 0 ] && [ $FRZR_STEAM_PROGRESS -eq 0 ]; then
 				echo "$FRZR_SOURCE" >"${MOUNT_PATH}/source"
 			fi
-
+			TASK_MSG="Checking if source exists"
+			send_data
 			if [ -e "${MOUNT_PATH}/source" ]; then
 				SOURCE=$(cat "${MOUNT_PATH}/source" | head -1)
 			else
 				echo "WARNING: source wasn't specified"
 			fi
-
+			TASK_MSG="Checking if this is supposed to be a local install..."
+			send_data
 			if [ "${local_install}" == true ]; then
 				mkdir tmp_source
 				mount -o rw -L FRZR_UPDATE /root/tmp_source
@@ -253,6 +256,8 @@ frzr_deploy() {
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
 				IMG_FILE="${FRZR_SOURCE}"
 			else
+				TASK_MSG="Downloading the system image file"
+				send_data
 				REPO=$(echo "${SOURCE}" | cut -f 1 -d ':')
 				CHANNEL=$(echo "${SOURCE}" | cut -f 2 -d ':')
 
@@ -284,6 +289,8 @@ frzr_deploy() {
 				if [ -e "${SUBVOL}" ]; then
 					# Only allow deleting the subvolume if we are booted in the installer.
 					if [ "$UPGRADE" -eq 0 ]; then
+						TASK_MSG="An already existing install was found"
+						send_data
 						MSG="${NAME} is already installed, would you like to delete this and re-deploy?"
 						if (whiptail --yesno "${MSG}" 10 50); then
 							echo "deleting ${NAME}"
@@ -298,11 +305,13 @@ frzr_deploy() {
 						continue
 					fi
 				fi
-
+				TASK_MSG="Checking if it was Steam that called this script"
+				send_data
 				if [ $FRZR_CHECK_UPDATE -eq 1 ]; then
 					echo "Update available: ${NAME}"
 				fi
-
+				TASK_MSG="Checking FRZR_STEAM_PROGRESS"
+				send_data
 				if [ $FRZR_STEAM_PROGRESS -eq 1 ]; then
 					curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
 						stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 91 %
