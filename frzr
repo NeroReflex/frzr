@@ -137,6 +137,7 @@ fi
 function=$1
 arg1=$2
 arg2=$3
+arg3=$4
 
 if [ $function == "help" ]; then
     echo "[Usage]
@@ -150,7 +151,7 @@ frzr build-initramfs [Build the initramfs for the kernel]
 frzr configure-tweaks [Configure system specific quirks]
 frzr bootstrap [Format and configure a drive to be used with FRZR]"
 elif [ $function == "bootstrap" ]; then
-    source frzr-bootstrap $arg1
+    source frzr-bootstrap $arg1 $arg2 $arg3 # username, disk, clean/repair install
 elif [ $function == "deploy" ]; then
     frzr_check_bootenv
     # We don't want to pass the function parameter to __frzr-deploy

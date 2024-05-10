@@ -240,7 +240,14 @@ if [ $EUID -ne 0 ]; then
 fi
 
 RUNNING=true
-STATE="FRZR_BOOTSTRAP_CHECK"
+
+# Check for the GUI installer
+if [ -z "$1" ] && [ "$1" != "gamer" ]; then
+    STATE="FORMAT"
+else
+    STATE="FRZR_BOOTSTRAP_CHECK"
+fi
+
 
 while $RUNNING; do
 	case "$STATE" in
@@ -283,6 +290,10 @@ while $RUNNING; do
 
 		if [ ! -z $1 ]; then
 			USERNAME=$1
+		fi
+
+		if [ ! -z $2 ]; then
+			DISK=$2
 		fi
 
 		fresh_install "${DISK}" "${MOUNT_PATH}"
