@@ -20,14 +20,14 @@ frzr_bootloader() {
 		case "$STATE" in
 		"BEGIN")
 			MOUNT_PATH="/frzr_root"
-			#hack to recursively umount any binded mounts...
-			umount --recursive $MOUNT_PATH
 			# Make sure the frzr_root is mounted during the deployment procedure
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
 			if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
 				MOUNT_PATH="/tmp/frzr_root"
+				#hack to recursively umount any binded mounts...
+				umount --recursive $MOUNT_PATH
 				#TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				mkdir -p ${MOUNT_PATH}
 				if mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"; then
