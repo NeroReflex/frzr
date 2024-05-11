@@ -20,7 +20,8 @@ frzr_bootloader() {
 		case "$STATE" in
 		"BEGIN")
 			MOUNT_PATH="/frzr_root"
-
+			#hack to recursively umount any binded mounts...
+			umount --recursive $MOUNT_PATH
 			# Make sure the frzr_root is mounted during the deployment procedure
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
@@ -203,6 +204,7 @@ frzr_bootloader() {
 			;;
 		*)
 			TASK_STATE="UNKNOWN_ERROR"
+
 			echo "ERROR: Something went terribly wrong in $(basename $0)"
 			RUNNING=false
 			;;
