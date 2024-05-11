@@ -252,7 +252,6 @@ fi
 TASK_TRACKER=0
 TASK_MSG="Bootstrapping the drive for the FRZR system"
 send_data
-sleep 3 # Wait for GUI to receive the first signal
 while $RUNNING; do
 	case "$STATE" in
 	"FRZR_BOOTSTRAP_CHECK")
