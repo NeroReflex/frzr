@@ -250,6 +250,8 @@ else
 fi
 
 TASK_TRACKER=0
+TASK_MSG="Bootstrapping the drive for the FRZR system"
+send_data
 while $RUNNING; do
 	case "$STATE" in
 	"FRZR_BOOTSTRAP_CHECK")
