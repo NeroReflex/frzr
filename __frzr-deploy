@@ -235,8 +235,7 @@ frzr_deploy() {
 			else
 				echo "WARNING: source wasn't specified"
 			fi
-			TASK_MSG="Checking if this is supposed to be a local install..."
-			send_data
+			TASK_MSG="Determining what source image we should use"
 			if [ "${local_install}" == true ]; then
 				mkdir tmp_source
 				mount -o rw -L FRZR_UPDATE /root/tmp_source
@@ -255,8 +254,7 @@ frzr_deploy() {
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
 				IMG_FILE="${FRZR_SOURCE}"
 			else
-				TASK_MSG="Downloading the system image file"
-				send_data
+				TASK_MSG="We will be downloading the image from the specified repo"
 				REPO=$(echo "${SOURCE}" | cut -f 1 -d ':')
 				CHANNEL=$(echo "${SOURCE}" | cut -f 2 -d ':')
 
