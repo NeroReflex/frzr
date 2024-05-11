@@ -339,11 +339,14 @@ clean_progress() {
 	local postfix=$2
 	local last_value=$scale
 	while IFS= read -r line; do
+		TASK_PROGRESS=0
 		value=$((${line} * ${scale} / 100))
 		if [ "$last_value" != "$value" ]; then
 			echo ${value}${postfix}
 			last_value=$value
 		fi
+		TASK_PROGRESS=$value
+		send_data
 	done
 }
 

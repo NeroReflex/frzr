@@ -41,7 +41,7 @@ frzr_deploy() {
 				continue
 			fi
 
-			TASK_MSG="Checking is system has booted via UEFI"
+			TASK_MSG="Checking if the system has booted via UEFI"
 			send_data
 			check_uefi_result=$(check_uefi)
 			if echo "${check_uefi_result}" | grep -Fqx 'ERROR'; then
@@ -224,14 +224,12 @@ frzr_deploy() {
 			;;
 		"DOWNLOAD")
 			TASK_STATE="DOWNLOAD"
-			TASK_MSG="Check if source needs updated or needs to be created for the first time"
-			send_data
+
 			# Check if source needs updated or needs to be created for the first time
 			if [ ! -z "$FRZR_SOURCE" ] && [ "$FRZR_SOURCE" != " " ] && [ $FRZR_CHECK_UPDATE -eq 0 ] && [ $FRZR_STEAM_PROGRESS -eq 0 ]; then
 				echo "$FRZR_SOURCE" >"${MOUNT_PATH}/source"
 			fi
-			TASK_MSG="Checking if source exists"
-			send_data
+
 			if [ -e "${MOUNT_PATH}/source" ]; then
 				SOURCE=$(cat "${MOUNT_PATH}/source" | head -1)
 			else
@@ -306,21 +304,20 @@ frzr_deploy() {
 						continue
 					fi
 				fi
-				TASK_MSG="Checking if it was Steam that called this script"
-				send_data
+
 				if [ $FRZR_CHECK_UPDATE -eq 1 ]; then
 					echo "Update available: ${NAME}"
 				fi
-				TASK_MSG="Checking FRZR_STEAM_PROGRESS"
-				send_data
+
 				if [ $FRZR_STEAM_PROGRESS -eq 1 ]; then
 					curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
 						stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 91 %
 				elif [ -z ${SHOW_UI} ]; then
-					TASK_MSG="SHOW_UI is not set"
+					TASK_MSG="Downloading Image"
 					send_data
 					echo "downloading ${NAME}"
-					curl --http1.1 -L -o "${IMG_FILE}" -C - "${IMG_URL}"
+					curl --http1.1 -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
+						stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 100
 				else
 					TASK_MSG="Using Whiptail to show download progress"
 					send_data
@@ -334,7 +331,7 @@ frzr_deploy() {
 			;;
 		"CHECKSUM")
 			TASK_STATE="CHECKSUM"
-			TASK_MSG="Verying checksums match"
+			TASK_MSG="Verifying if checksums match"
 			send_data
 			ACTUAL_CHECKSUM=$(sha256sum "${IMG_FILE}" | cut -d' ' -f 1)
 			if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
@@ -376,7 +373,7 @@ frzr_deploy() {
 			fi
 
 			# Install the deployment from the downloaded file $IMG_FILE and place the deployed image in $DEPLOY_PATH
-			TASK_MSG="Installing the downloaded deployment"
+			TASK_MSG="Extracting Image"
 			send_data
 			local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
 			if echo "${install_result}" | grep -Fqx 'ERROR'; then
