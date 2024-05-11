@@ -153,9 +153,6 @@ frzr build-initramfs [Build the initramfs for the kernel]
 frzr configure-tweaks [Configure system specific quirks]
 frzr bootstrap [Format and configure a drive to be used with FRZR]"
 elif [ $function == "bootstrap" ]; then
-    TASK_MSG="Starting FRZR Bootstrap"
-    send_data
-    sleep 3 # Wait for GUI to receive the signal
     source frzr-bootstrap $arg1 $arg2 $arg3 # username, disk, clean/repair install
     RESULT=$?
     exit $RESULT
@@ -163,8 +160,6 @@ elif [ $function == "deploy" ]; then
     frzr_check_bootenv
     # We don't want to pass the function parameter to __frzr-deploy
     shift
-    TASk_MSG="Starting FRZR Deploy"
-    send_data
     #flock -E 255 -n /tmp/frzr.lock "frzr-deploy" "$@"
     source "${BASH_SOURCE%/*}/frzr-deploy" "$@"
     RESULT=$TASK_ERROR
