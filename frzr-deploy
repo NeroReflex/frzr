@@ -5,6 +5,6 @@ source "${BASH_SOURCE%/*}/__frzr-deploy"
 # TODO: check the file lock exists
 
 frzr_deploy "$@"
-RESULT=$?
-
-exit $RESULT
+# We don't need to check the exit status here because this is being ran and handled in frzr
+# RESULT=$?
+# exit $RESULT
