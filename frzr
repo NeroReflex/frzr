@@ -7,16 +7,25 @@ if [ $EUID -ne 0 ]; then
     exit 1
 fi
 
-if [ $# -eq 0 ]; then
-    usage
-    exit 1
-fi
-
 # Import methods
 source "${BASH_SOURCE%/*}/__frzr" "$@"
 
 # Create the tracker file before we start
 write_tracker_file
+
+usage(){
+    echo "[Usage]
+frzr deploy [Check for system updates and update the system if available]
+frzr bootloader [Install the bootloader and create entries for every deployed image]
+frzr unlock (deployment) [Unlock the specified deployment, or the running one if deployment is not specified]
+frzr kernel [Deploy a custom kernel]
+frzr set-channel [Set the update channel stable/testing/unstable]
+frzr get-channel [Get the update channel currently in use]
+frzr version [Get the version of FRZR]
+frzr build-initramfs [Build the initramfs for the kernel]
+frzr configure-tweaks [Configure system specific quirks]
+frzr bootstrap [Format and configure a drive to be used with FRZR]"
+}
 
 # Catch unexpected errors and give feedback
 handle_error() {
@@ -36,24 +45,16 @@ handle_error() {
 # Set up trap to catch errors and call handle_error function
 trap 'handle_error "${FUNCNAME[0]}" "$LINENO" "$BASH_COMMAND"' ERR
 
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+fi
+
 function=$1
 arg1=$2
 arg2=$3
 arg3=$4
 
-usage(){
-    echo "[Usage]
-frzr deploy [Check for system updates and update the system if available]
-frzr bootloader [Install the bootloader and create entries for every deployed image]
-frzr unlock (deployment) [Unlock the specified deployment, or the running one if deployment is not specified]
-frzr kernel [Deploy a custom kernel]
-frzr set-channel [Set the update channel stable/testing/unstable]
-frzr get-channel [Get the update channel currently in use]
-frzr version [Get the version of FRZR]
-frzr build-initramfs [Build the initramfs for the kernel]
-frzr configure-tweaks [Configure system specific quirks]
-frzr bootstrap [Format and configure a drive to be used with FRZR]"
-}
 if [ $function == "-h" ] || [ $function == "help" ]; then
     usage
 elif [ $function == "bootstrap" ]; then
