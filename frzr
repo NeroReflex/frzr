@@ -155,7 +155,7 @@ frzr build-initramfs [Build the initramfs for the kernel]
 frzr configure-tweaks [Configure system specific quirks]
 frzr bootstrap [Format and configure a drive to be used with FRZR]"
 elif [ $function == "bootstrap" ]; then
-    source frzr-bootstrap $arg1 $arg2 $arg3 # username, disk, clean/repair install
+    source "${BASH_SOURCE%/*}/frzr-bootstrap" "${arg1}" "${arg2}" "${arg3}" # username, disk, clean/repair install
     RESULT=$?
     exit $RESULT
 elif [ $function == "deploy" ]; then
