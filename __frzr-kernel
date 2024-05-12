@@ -9,8 +9,6 @@ kernel() {
 
 	KERNEL_NAME=""
 
-	MODULES_DIR="/tmp/modules/"
-
 	MOUNTED_MOUNT_PATH="no"
 	MOUNTED_EFI_MOUNT_PATH="no"
 
@@ -60,6 +58,15 @@ kernel() {
 				continue
 			fi
 
+			if [ -d "${MOUNT_PATH}/kernels/usr" ]; then
+				MODULES_DIR="${MOUNT_PATH}/kernels"
+			else
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not find kernels overlay in '${MOUNT_PATH}/kernels/usr'"
+				STATE="FAIL"
+				continue
+			fi
+
 			STATE="DOWNLOAD"
 			;;
 
@@ -77,6 +84,11 @@ kernel() {
 		"BUILD")
 			# Fetch the name of the kernel (uname -r)
 			KERNEL_NAME=$(make -s kernelrelease)
+
+			echo "Checking for pre-installed kernel"
+			if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
+				
+			fi
 
 			echo "Building ${KERNEL_NAME}..."
 
