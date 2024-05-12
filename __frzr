@@ -53,6 +53,35 @@ send_data(){
 	write_tracker_file
 }
 
+frzr_check_bootenv() {
+    if [ -d /tmp/frzr_root ]; then
+        UPGRADE=0
+    else
+        UPGRADE=1
+    fi
+}
+
+frzr_chroot() {
+    local CHROOT_PATH=$1
+    local CHROOT_CMD=$2
+
+    mount -t proc /proc proc/
+    mount -t sysfs /sys sys/
+    mount --rbind /dev dev/
+
+    chroot ${CHROOT_PATH} /bin/bash <<EOF
+    ${CHROOT_CMD}
+EOF
+}
+
+frzr_undo_chroot() {
+    local CHROOT_PATH=$1
+    umount -l ${CHROOT_PATH}/proc
+    umount -l ${CHROOT_PATH}/sys
+    mount --make-rslave ${CHROOT_PATH}/dev
+    umount -l ${CHROOT_PATH}/dev
+}
+
 # Get the UUID of the desk containing the given directory
 # $1 the directory
 # stdout UUID (compatible with /dev/disk/by-uuid/), an error otherwise

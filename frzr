@@ -2,53 +2,23 @@
 
 set -Ee
 
+if [ $EUID -ne 0 ]; then
+    echo "$(basename $0) must be run as root"
+    exit 1
+fi
+
+if [ $# -eq 0 ]; then
+    echo "Frzr requires at least one argument. Use frzr help for usage"
+    exit
+fi
+
 # Import methods
 source "${BASH_SOURCE%/*}/__frzr" "$@"
-
-frzr_check_bootenv() {
-    if [ -d /tmp/frzr_root ]; then
-        UPGRADE=0
-    else
-        UPGRADE=1
-    fi
-}
-
-frzr_chroot() {
-    local CHROOT_PATH=$1
-    local CHROOT_CMD=$2
-
-    mount -t proc /proc proc/
-    mount -t sysfs /sys sys/
-    mount --rbind /dev dev/
-
-    chroot ${CHROOT_PATH} /bin/bash <<EOF
-    ${CHROOT_CMD}
-EOF
-}
-
-frzr_undo_chroot() {
-    local CHROOT_PATH=$1
-    umount -l ${CHROOT_PATH}/proc
-    umount -l ${CHROOT_PATH}/sys
-    mount --make-rslave ${CHROOT_PATH}/dev
-    umount -l ${CHROOT_PATH}/dev
-}
-
-frzr_check() {
-    local result=$1
-    if [ $result == 0 ]; then
-        value="✓"
-    else
-        value="✗"
-    fi
-
-    echo $value
-}
 
 # Create the tracker file before we start
 write_tracker_file
 
-# Define a function to handle errors
+# Catch unexpected errors and give feedback
 handle_error() {
     local function_name="$1"
     local line_number="$2"
@@ -65,17 +35,6 @@ handle_error() {
 
 # Set up trap to catch errors and call handle_error function
 trap 'handle_error "${FUNCNAME[0]}" "$LINENO" "$BASH_COMMAND"' ERR
-
-# Begin execution
-if [ $EUID -ne 0 ]; then
-    echo "$(basename $0) must be run as root"
-    exit 1
-fi
-
-if [ $# -eq 0 ]; then
-    echo "Frzr requires at least one argument. Use frzr help for usage"
-    exit
-fi
 
 function=$1
 arg1=$2
