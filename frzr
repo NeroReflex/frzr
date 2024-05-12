@@ -2,9 +2,6 @@
 
 set -Ee
 
-# All global variables are sourced from __frzr-debug
-source "${BASH_SOURCE%/*}/__frzr-debug"
-
 # Import methods
 source "${BASH_SOURCE%/*}/__frzr" "$@"
 
@@ -101,10 +98,6 @@ frzr_check() {
     echo $value
 }
 
-write_tracker_file() {
-	frzr_status >"$TRACKER_FILE_DIR/frzr.tracker"
-}
-
 # Create the tracker file before we start
 write_tracker_file
 # Write tracker file when frzr exits
@@ -146,6 +139,7 @@ arg3=$4
 if [ $function == "help" ]; then
     echo "[Usage]
 frzr deploy [Check for system updates and update the system if available]
+frzr bootloader [Install the bootloader and create entries for every deployed image]
 frzr unlock (deployment) [Unlock the specified deployment, or the running one if deployment is not specified]
 frzr kernel [Deploy a custom kernel]
 frzr set-channel [Set the update channel stable/testing/unstable]
@@ -174,8 +168,22 @@ elif [ $function == "unlock" ]; then
     # We don't want to pass the function parameter to __frzr-unlock
     shift
 
-    #flock -E 255 -n /tmp/frzr.lock "frzr-deploy" "$@"
+    #flock -E 255 -n /tmp/frzr.lock "frzr-unlock" "$@"
     source "${BASH_SOURCE%/*}/frzr-unlock" "$@"
+    RESULT=$?
+
+    #if [ $RESULT == 255 ]; then
+    #    echo "ERROR: $(basename $0) is already running"
+    #fi
+
+    exit $RESULT
+elif [ $function == "bootloader" ]; then
+    frzr_check_bootenv
+    # We don't want to pass the function parameter to __frzr-bootloader
+    shift
+
+    #flock -E 255 -n /tmp/frzr.lock "frzr-bootloader" "$@"
+    source "${BASH_SOURCE%/*}/frzr-bootloader" "$@"
     RESULT=$?
 
     #if [ $RESULT == 255 ]; then
@@ -185,7 +193,7 @@ elif [ $function == "unlock" ]; then
     exit $RESULT
 elif [ $function == "kernel" ]; then
     frzr_check_bootenv
-    # We don't want to pass the function parameter to __frzr-deploy
+    # We don't want to pass the function parameter to __frzr-kernel
     shift
     source "${BASH_SOURCE%/*}/__frzr-kernel"
 

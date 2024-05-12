@@ -1,9 +1,17 @@
 #! /bin/bash
 
+# All global variables are sourced from __frzr-debug
+source "${BASH_SOURCE%/*}/__frzr-debug"
+
+write_tracker_file() {
+	frzr_status >"$TRACKER_FILE_DIR/frzr.tracker"
+}
+
 send_data(){
 	sleep 1
 	write_tracker_file
 }
+
 # Get the UUID of the desk containing the given directory
 # $1 the directory
 # stdout UUID (compatible with /dev/disk/by-uuid/), an error otherwise
