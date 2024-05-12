@@ -5,19 +5,6 @@ set -Ee
 # Import methods
 source "${BASH_SOURCE%/*}/__frzr" "$@"
 
-# Tracker file directory
-TRACKER_FILE_DIR="/tmp/"
-
-# Signals
-TASK_STATE=""
-TASK_MSG=""         # TASK_MSG will be read by external tools. EX TASK_MSG="Preparing user directory"
-TASK_TRACKER=0      # TASK_TRACKER will be used to signal back that the current TASK_MSG in queue is handled or not 0 = Pending 1 = Completed
-TASK_ERROR=0        # Signal to let listeners know that the task had an error.
-TASK_ERROR_MSG=""   # Error message. EX: "Unexpected I/O errors found during write"
-TASK_WARNING=0      # Signal to let listeners know there is a warning
-TASK_WARNING_MSG="" # Warning message. EX: "BTRFS filesystem was supposed to be locked, but it was already unlocked. Continuing.."
-TASK_PROGRESS=0     # Use this whenever we want to send progress to the GUI in the form of whole number percentages
-
 frzr_check_bootenv() {
     if [ -d /tmp/frzr_root ]; then
         UPGRADE=0
@@ -47,46 +34,6 @@ frzr_undo_chroot() {
     umount -l ${CHROOT_PATH}/dev
 }
 
-frzr_status() {
-    # Output frzr status tracker using the JSON format
-    cat <<EOF
-{
-    "Signals": {
-        "Task MSG": "$TASK_MSG",
-        "Task Tracker": "$TASK_TRACKER",
-        "Task Error": "$TASK_ERROR",
-        "Task Error MSG": "$TASK_ERROR_MSG",
-        "Task Warning": "$TASK_WARNING",
-        "Task Warning MSG": "$TASK_WARNING_MSG",
-        "Task Progress": "$TASK_PROGRESS",
-    },
-    "Globals": {
-        "Target": "$TARGET",
-        "Local Install": "$LOCAL_INSTALL",
-        "Repair Install": "$REPAIR_INSTALL",
-        "Show UI": "$SHOW_UI",
-        "EFI Path": "$EFI_MOUNT_PATH",
-        "Mount Path": "$MOUNT_PATH",
-        "SUBVOL": "$SUBVOL",
-        "Deploy Path": "$DEPLOY_PATH",
-        "Frzr Check Update": "$FRZR_CHECK_UPDATE",
-        "Frzr Params": "$FRZR_PARAMS",
-        "File Name": "$FILE_NAME",
-        "IMG Name": "$IMG_NAME",
-        "Base URL": "$BASE_URL",
-        "Repo": "$REPO",
-        "Release URL": "$RELEASES_URL",
-        "Expected Checksum": "$EXPECTED_CHECKSUM",
-        "Actual Checksum": "$ACTUAL_CHECKSUM",
-        "Channel": "$CHANNEL",
-        "State Machine State": "$STATE"
-    }
-}
-EOF
-}
-
-trap frzr_status SIGINT SIGTERM ERR
-
 frzr_check() {
     local result=$1
     if [ $result == 0 ]; then
@@ -100,8 +47,7 @@ frzr_check() {
 
 # Create the tracker file before we start
 write_tracker_file
-# Write tracker file when frzr exits
-#trap write_tracker_file SIGINT SIGTERM EXIT ERR
+
 # Define a function to handle errors
 handle_error() {
     local function_name="$1"

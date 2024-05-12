@@ -1,7 +1,48 @@
 #! /bin/bash
 
-# All global variables are sourced from __frzr-debug
-source "${BASH_SOURCE%/*}/__frzr-debug"
+# All global variables and signals are sourced from __frzr-envars
+source "${BASH_SOURCE%/*}/__frzr-envars"
+
+frzr_status() {
+    # Output frzr status tracker using the JSON format
+    cat <<EOF
+{
+    "Signals": {
+        "Task MSG": "$TASK_MSG",
+        "Task Tracker": "$TASK_TRACKER",
+        "Task Error": "$TASK_ERROR",
+        "Task Error MSG": "$TASK_ERROR_MSG",
+        "Task Warning": "$TASK_WARNING",
+        "Task Warning MSG": "$TASK_WARNING_MSG",
+        "Task Progress": "$TASK_PROGRESS",
+    },
+    "Globals": {
+        "Target": "$TARGET",
+        "Local Install": "$LOCAL_INSTALL",
+        "Repair Install": "$REPAIR_INSTALL",
+        "Show UI": "$SHOW_UI",
+        "EFI Path": "$EFI_MOUNT_PATH",
+        "Mount Path": "$MOUNT_PATH",
+        "SUBVOL": "$SUBVOL",
+        "Deploy Path": "$DEPLOY_PATH",
+        "Frzr Check Update": "$FRZR_CHECK_UPDATE",
+        "Frzr Params": "$FRZR_PARAMS",
+        "File Name": "$FILE_NAME",
+        "IMG Name": "$IMG_NAME",
+        "Base URL": "$BASE_URL",
+        "Repo": "$REPO",
+        "Release URL": "$RELEASES_URL",
+        "Expected Checksum": "$EXPECTED_CHECKSUM",
+        "Actual Checksum": "$ACTUAL_CHECKSUM",
+        "Channel": "$CHANNEL",
+        "State Machine State": "$STATE"
+    }
+}
+EOF
+}
+
+# Write tracker file when frzr exits unexpectedly
+trap frzr_status SIGINT SIGTERM ERR
 
 write_tracker_file() {
 	frzr_status >"$TRACKER_FILE_DIR/frzr.tracker"

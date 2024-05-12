@@ -30,3 +30,16 @@ RELEASES_URL=""
 EXPECTED_CHECKSUM="" # Expected checksum value of downloaded file
 ACTUAL_CHECKSUM=""   # Actual checksum of the file downloaded
 STATE=""
+
+# Tracker file directory
+TRACKER_FILE_DIR="/tmp/"
+
+# Signals
+TASK_STATE=""
+TASK_MSG=""         # TASK_MSG will be read by external tools. EX TASK_MSG="Preparing user directory"
+TASK_TRACKER=0      # TASK_TRACKER will be used to signal back that the current TASK_MSG in queue is handled or not 0 = Pending 1 = Completed
+TASK_ERROR=0        # Signal to let listeners know that the task had an error.
+TASK_ERROR_MSG=""   # Error message. EX: "Unexpected I/O errors found during write"
+TASK_WARNING=0      # Signal to let listeners know there is a warning
+TASK_WARNING_MSG="" # Warning message. EX: "BTRFS filesystem was supposed to be locked, but it was already unlocked. Continuing.."
+TASK_PROGRESS=0     # Use this whenever we want to send progress to the GUI in the form of whole number percentages
