@@ -8,8 +8,8 @@ if [ $EUID -ne 0 ]; then
 fi
 
 if [ $# -eq 0 ]; then
-    echo "Frzr requires at least one argument. Use frzr help for usage"
-    exit
+    usage
+    exit 1
 fi
 
 # Import methods
@@ -41,7 +41,7 @@ arg1=$2
 arg2=$3
 arg3=$4
 
-if [ $function == "help" ]; then
+usage(){
     echo "[Usage]
 frzr deploy [Check for system updates and update the system if available]
 frzr bootloader [Install the bootloader and create entries for every deployed image]
@@ -53,7 +53,9 @@ frzr version [Get the version of FRZR]
 frzr build-initramfs [Build the initramfs for the kernel]
 frzr configure-tweaks [Configure system specific quirks]
 frzr bootstrap [Format and configure a drive to be used with FRZR]"
-elif [ $function == "bootstrap" ]; then
+}
+
+if [ $function == "bootstrap" ]; then
     source "${BASH_SOURCE%/*}/frzr-bootstrap" "${arg1}" "${arg2}" "${arg3}" # username, disk, clean/repair install
     RESULT=$?
     exit $RESULT
