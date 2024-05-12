@@ -249,7 +249,9 @@ else
     STATE="FRZR_BOOTSTRAP_CHECK"
 fi
 
-
+TASK_TRACKER=0
+TASK_MSG="Bootstrapping the drive for the FRZR system"
+send_data
 while $RUNNING; do
 	case "$STATE" in
 	"FRZR_BOOTSTRAP_CHECK")
@@ -286,8 +288,6 @@ while $RUNNING; do
 		;;
 	"FORMAT")
 		echo "We are doing a fresh install"
-		TASK_MSG="We are doing a fresh install"
-
 		USERNAME=user
 
 		if [ ! -z $1 ]; then
@@ -301,11 +301,10 @@ while $RUNNING; do
 		fresh_install "${DISK}" "${MOUNT_PATH}"
 		RESULT=$?
 		if [ $RESULT -eq 0 ]; then
-			TASK_MSG="Bootstrap succeededd"
 			STATE="SUCCESS"
 		else
-			TASK_MSG="Bootstrap failed"
 			STATE="FAIL"
+			TASK_ERROR_MSG="Fresh installation has failed"
 			continue
 		fi
 		;;
@@ -316,22 +315,28 @@ while $RUNNING; do
 			STATE="SUCCESS"
 		else
 			STATE="FAIL"
+			TASK_ERROR_MSG="Repair installation has failed"
 			continue
 		fi
 		;;
 	"SUCCESS")
 		echo "Successfully prepared the drive for an FRZR installation"
 		TASK_MSG="Successfully prepared the drive for an FRZR installation"
+		TASK_TRACKER=1
+		send_data
 		RUNNING=false
 		;;
 	"FAIL")
 		echo "The bootstrap failed"
 		TASK_ERROR=1
+		send_data
 		RUNNING=false
 		;;
 	*)
 		echo "Something went terribly wrong"
+		TASK_ERROR_MSG="Bootstrap hit an unexpected state"
 		TASK_ERROR=1
+		send_data
 		RUNNING=false
 		;;
 	esac

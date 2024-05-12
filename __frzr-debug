@@ -12,9 +12,6 @@ if [ -z $LOCAL_INSTALL ]; then
     LOCAL_INSTALL=0 # Set to 1 to perform a local media install. This should be set by the installer script
 fi
 
-if [ -z $SHOW_UI ]; then
-    SHOW_UI=0 # Show the whiptail UI. This is used to show the installation and extraction progress. This should be set only by the installer script.
-fi
 UPGRADE=0
 REPAIR_INSTALL=0 # Set to 1 if you want to do a repair install. This should be set by frzr-bootstrap later if an existing install is found.
 NAME=""          # Name of the OS to be deployed

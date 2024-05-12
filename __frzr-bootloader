@@ -20,7 +20,6 @@ frzr_bootloader() {
 		case "$STATE" in
 		"BEGIN")
 			MOUNT_PATH="/frzr_root"
-
 			# Make sure the frzr_root is mounted during the deployment procedure
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
@@ -28,6 +27,8 @@ frzr_bootloader() {
 			if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
 				echo "${MOUNT_PATH} Not mounted..."
 				MOUNT_PATH="/tmp/frzr_root"
+				#hack to recursively umount any binded mounts...
+				umount --recursive $MOUNT_PATH
 				#TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				mkdir -p ${MOUNT_PATH}
 				if mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"; then
@@ -114,6 +115,7 @@ frzr_bootloader() {
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Could not install systemd-boot to '${EFI_MOUNT_PATH}'"
 					STATE="FAIL"
+
 					continue
 				fi
 			fi
@@ -206,6 +208,7 @@ frzr_bootloader() {
 			;;
 		*)
 			TASK_STATE="UNKNOWN_ERROR"
+
 			echo "ERROR: Something went terribly wrong in $(basename $0)"
 			RUNNING=false
 			;;
