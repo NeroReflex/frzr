@@ -38,7 +38,6 @@ frzr_bootloader() {
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Could not bind ${MOUNT_PATH} to frzr_root main subvolume"
 					STATE="FAIL"
-					send_data
 					continue
 				fi
 				sleep 5
@@ -61,7 +60,6 @@ frzr_bootloader() {
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Could not bind ${EFI_MOUNT_PATH} to frzr_efi (boot) partition"
 					STATE="FAIL"
-					send_data
 					continue
 				fi
 				sleep 5
@@ -207,13 +205,16 @@ frzr_bootloader() {
 			#TASK_STATE="FAIL"
 
 			echo "ERROR: frzr-bootloader failed: ${TASK_ERROR_MSG}"
-
+			TASK_ERROR=1
+			send_data
 			RUNNING=false
 			;;
 		*)
 			TASK_STATE="UNKNOWN_ERROR"
 
 			echo "ERROR: Something went terribly wrong in $(basename $0)"
+			TASK_ERROR=1
+			send_data
 			RUNNING=false
 			;;
 		esac
