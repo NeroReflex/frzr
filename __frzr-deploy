@@ -425,14 +425,15 @@ frzr_deploy() {
 			# Delete the downloaded system img etc.
 			echo "Doing frzr-bootloader '${NAME}'"
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-			local efi_update_result=$(frzr-bootloader "${NAME}")
-			if echo "${efi_update_result}" | grep -q 'ERROR'; then
-				# bootloader configuration could not be updated
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not update the EFI partition: ${efi_update_result}"
-				STATE="FAIL"
-				continue
-			fi
+			#local efi_update_result=$(frzr-bootloader "${NAME}")
+			frzr-bootloader "${NAME}"
+			#if echo "${efi_update_result}" | grep -q 'ERROR'; then
+			#	# bootloader configuration could not be updated
+			#	TASK_ERROR=1
+			#	TASK_ERROR_MSG="Could not update the EFI partition: ${efi_update_result}"
+			#	STATE="FAIL"
+			#	continue
+			#fi
 			echo "Done frzr_sdboot"
 			# Remove download artifacts (if any)
 			rm -f ${MOUNT_PATH}/*.img.*

@@ -26,10 +26,12 @@ frzr_bootloader() {
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
 			if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
+				echo "${MOUNT_PATH} Not mounted..."
 				MOUNT_PATH="/tmp/frzr_root"
 				#TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				mkdir -p ${MOUNT_PATH}
 				if mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"; then
+					echo "Mounting ${MOUNT_PATH}..."
 					MOUNTED_MOUNT_PATH="yes"
 				fi
 				sleep 5
@@ -45,8 +47,10 @@ frzr_bootloader() {
 			EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
 
 			if ! mountpoint -q "${EFI_MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
+				echo "${EFI_MOUNT_PATH} Not mounted..."
 				mkdir -p "${EFI_MOUNT_PATH}"
 				if mount -L frzr_efi "${EFI_MOUNT_PATH}"; then
+					echo "Mounting ${EFI_MOUNT_PATH}"
 					MOUNTED_EFI_MOUNT_PATH="yes"
 				fi
 				sleep 5
@@ -59,7 +63,7 @@ frzr_bootloader() {
 				STATE="FAIL"
 				continue
 			fi
-
+			mount
 			STATE="CHECK"
 			;;
 
