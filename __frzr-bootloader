@@ -10,9 +10,6 @@ frzr_bootloader() {
     DEPLOY_PATH="/"
     SUBVOL="/"
 
-    local MOUNTED_MOUNT_PATH="no"
-	local MOUNTED_EFI_MOUNT_PATH="no"
-
 	local RUNNING=true
     RUNNING=true
 	STATE="BEGIN"
@@ -24,47 +21,54 @@ frzr_bootloader() {
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
-			if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
-				echo "${MOUNT_PATH} Not mounted..."
+			if mount | grep -Fqx "${MOUNT_PATH}"; then
+				local MOUNTED_MOUNT_PATH="no"
+				echo "${MOUNT_PATH} mounted already"
+			else
+				echo "${MOUNT_PATH} NOT mounted yet"
 				MOUNT_PATH="/tmp/frzr_root"
-				#hack to recursively umount any binded mounts...
-				umount --recursive $MOUNT_PATH
-				#TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
-				mkdir -p ${MOUNT_PATH}
+				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
+				send_data
+				mkdir -p "${MOUNT_PATH}"
 				if mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"; then
-					echo "Mounting ${MOUNT_PATH}..."
-					MOUNTED_MOUNT_PATH="yes"
+					local MOUNTED_MOUNT_PATH="yes"
+					echo "${MOUNT_PATH} mount success"
+				else
+					echo "${MOUNT_PATH} mount failure"
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not bind ${MOUNT_PATH} to frzr_root main subvolume"
+					STATE="FAIL"
+					send_data
+					continue
 				fi
 				sleep 5
-			fi
-
-			if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
-				echo "frzr-kernel failed: could not mount frzr_root"
-				STATE="FAIL"
-				continue
 			fi
 
 			# Make sure the EFI partition is mounted during the deployment procedure
 			EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
 
-			if ! mountpoint -q "${EFI_MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
-				echo "${EFI_MOUNT_PATH} Not mounted..."
+			if mount | grep -Fqx "${EFI_MOUNT_PATH}"; then
+				local MOUNTED_EFI_MOUNT_PATH="no"
+				echo "${EFI_MOUNT_PATH} mounted already"
+			else
+				echo "${EFI_MOUNT_PATH} not mounted yet"
 				mkdir -p "${EFI_MOUNT_PATH}"
 				if mount -L frzr_efi "${EFI_MOUNT_PATH}"; then
-					echo "Mounting ${EFI_MOUNT_PATH}"
-					MOUNTED_EFI_MOUNT_PATH="yes"
+					echo "${EFI_MOUNT_PATH} mount success"
+					local MOUNTED_EFI_MOUNT_PATH="yes"
+				else
+					echo "${EFI_MOUNT_PATH} mount failed"
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not bind ${EFI_MOUNT_PATH} to frzr_efi (boot) partition"
+					STATE="FAIL"
+					send_data
+					continue
 				fi
 				sleep 5
 			fi
 
-			# Check the "EFI System" partition is actually mounted
-			if ! mountpoint -q "${EFI_MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_efi >/dev/null; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not bind ${EFI_MOUNT_PATH} to frzr_efi (boot) partition"
-				STATE="FAIL"
-				continue
-			fi
 			mount
+
 			STATE="CHECK"
 			;;
 
