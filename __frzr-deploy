@@ -318,13 +318,24 @@ frzr_deploy() {
 					curl --http1.1 -# -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
 						stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 91 %
 				elif [ -z ${SHOW_UI} ]; then
+					# This will need to be put under a new variable if it passes testing because we want to have different
+					# logic depending if there is a Modern UI, legecy UI support, or if it is ran via CLI
 					TASK_MSG="Downloading Image"
 					send_data
 					echo "downloading ${NAME}"
-				# For some reason this method breaks the GUI installer
-				#	curl --http1.1 -L -o "${IMG_FILE}" -C - "${IMG_URL}" 2>&1 |
-				#		stdbuf -oL tr '\r' '\n' | grep --line-buffered -oP '[0-9]*+(?=.[0-9])' | clean_progress 100
-					curl --http1.1 -L -o "${IMG_FILE}" -C - "${IMG_URL}"
+
+					wget ${IMG_URL} -O ${IMG_FILE} -o wget_output.log & pid=$!;
+					previous_percentage=-1;
+					while [ -e /proc/$pid ]; do
+					    percentage=$(awk '/[0-9]+%/{print substr($7, 1, length($7)-1)}' wget_output.log | tail -n 1);
+					    if [[ $percentage =~ ^[0-9]+$ && $percentage -ne $previous_percentage ]]; then
+						echo "$percentage";
+						previous_percentage=$percentage;
+						TASK_PROGRESS=$percentage
+						send_data
+					    fi;
+					    sleep 1;
+					done
 				else
 					TASK_MSG="Using Whiptail to show download progress"
 					send_data
