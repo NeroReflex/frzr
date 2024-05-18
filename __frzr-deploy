@@ -324,10 +324,10 @@ frzr_deploy() {
 					send_data
 					echo "downloading ${NAME}"
 
-					wget ${IMG_URL} -O ${IMG_FILE} -o wget_output.log & pid=$!;
+					wget ${IMG_URL} -O ${IMG_FILE} -o /tmp/wget_output.log & pid=$!;
 					previous_percentage=-1;
 					while [ -e /proc/$pid ]; do
-					    percentage=$(awk '/[0-9]+%/{print substr($7, 1, length($7)-1)}' wget_output.log | tail -n 1);
+					    percentage=$(awk '/[0-9]+%/{print substr($7, 1, length($7)-1)}' /tmp/wget_output.log | tail -n 1);
 					    if [[ $percentage =~ ^[0-9]+$ && $percentage -ne $previous_percentage ]]; then
 						echo "$percentage";
 						previous_percentage=$percentage;
