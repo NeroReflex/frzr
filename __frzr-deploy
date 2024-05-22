@@ -168,9 +168,13 @@ frzr_deploy() {
 				if [ ! -z "${deployment_to_be_removed}" ] && [ -d "${deployment_to_be_removed}" ]; then
 					if is_btrfs_subvolume "${deployment_to_be_removed}"; then
 						local removal_deployment=$(basename "${deployment_to_be_removed}")
+						local removal_deployment_subvolid=$(btrfs_subvol_get_id "${deployment_to_be_removed}")
 
 						if echo "${removal_deployment}" | grep -Fqx "${CURRENT}"; then
-							echo "Deployment will be kept: ${removal_deployment}"
+							echo "Deployment will be kept: '${removal_deployment}' is the current deployment"
+						elif echo "${removal_deployment_subvolid}" | grep -Fqx "ERROR"; then
+							echo "Deployment will be kept: '${removal_deployment}' cannot get the subvolid and it's too risky"
+						# TODO: elif removal_deployment_subvolid==current_default_subvol
 						else
 							TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}'"
 							send_data
