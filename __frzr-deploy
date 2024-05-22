@@ -92,18 +92,15 @@ frzr_deploy() {
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
 			if mount | grep -Fqx "${MOUNT_PATH}"; then
 				local MOUNTED_MOUNT_PATH="no"
-				echo "${MOUNT_PATH} mounted already"
 			else
-				echo "${MOUNT_PATH} NOT mounted yet"
 				MOUNT_PATH="/tmp/frzr_root"
 				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				send_data
 				mkdir -p "${MOUNT_PATH}"
 				if mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"; then
 					local MOUNTED_MOUNT_PATH="yes"
-					echo "${MOUNT_PATH} mount success"
 				else
-					echo "${MOUNT_PATH} mount failure"
+					local MOUNTED_MOUNT_PATH="no"
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Could not bind ${MOUNT_PATH} to frzr_root main subvolume"
 					STATE="FAIL"
@@ -136,15 +133,12 @@ frzr_deploy() {
 
 			if mount | grep -Fqx "${EFI_MOUNT_PATH}"; then
 				local MOUNTED_EFI_MOUNT_PATH="no"
-				echo "${EFI_MOUNT_PATH} mounted already"
 			else
-				echo "${EFI_MOUNT_PATH} not mounted yet"
 				mkdir -p "${EFI_MOUNT_PATH}"
 				if mount -L frzr_efi "${EFI_MOUNT_PATH}"; then
-					echo "${EFI_MOUNT_PATH} mount success"
 					local MOUNTED_EFI_MOUNT_PATH="yes"
 				else
-					echo "${EFI_MOUNT_PATH} mount failed"
+					local MOUNTED_EFI_MOUNT_PATH="no"
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Could not bind ${EFI_MOUNT_PATH} to frzr_efi (boot) partition"
 					STATE="FAIL"
@@ -180,15 +174,14 @@ frzr_deploy() {
 						else
 							TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}'"
 							send_data
-							echo "$TASK_MSG"
+
+							# TODO: get default deployment of disk and refuse to remove the currently-default deployment
 
 							# Delete deployment boot files taking up space in /efi 
 							if [ -d "${EFI_MOUNT_PATH}/${removal_deployment}" ]; then
 								TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${removal_deployment}'"
 								send_data
-								echo "Doing rm -rf ${EFI_MOUNT_PATH}/${removal_deployment}"
 								rm -rf "${EFI_MOUNT_PATH}/${removal_deployment}"
-								echo "Done rm -rf"
 							fi
 							
 							# Delete deployment entries (this code is based on the fact that names of entries are generated as they are in prepare_efi_partition)
@@ -196,7 +189,6 @@ frzr_deploy() {
 								if echo "${entry_path}" | grep -Fqx "${removal_deployment}"; then
 									TASK_MSG="deleting deployment boot entry '${entry_path}'"
 									send_data
-									echo "Doing rm -rf ${entry_path}"
 									rm -f "${entry_path}"
 								fi
 							done
@@ -322,17 +314,15 @@ frzr_deploy() {
 					# logic depending if there is a Modern UI, legecy UI support, or if it is ran via CLI
 					TASK_MSG="Downloading Image"
 					send_data
-					echo "downloading ${NAME}"
 					touch /tmp/wget_output.log # Create log to be used for recording progress
 					wget ${IMG_URL} -O ${IMG_FILE} -o /tmp/wget_output.log & pid=$!;
 					previous_percentage=-1;
 					while [ -e /proc/$pid ]; do
 					    percentage=$(awk '/[0-9]+%/{print substr($7, 1, length($7)-1)}' /tmp/wget_output.log | tail -n 1);
 					    if [[ $percentage =~ ^[0-9]+$ && $percentage -ne $previous_percentage ]]; then
-						echo "$percentage";
-						previous_percentage=$percentage;
-						TASK_PROGRESS=$percentage
-						send_data
+							previous_percentage=$percentage;
+							TASK_PROGRESS=$percentage
+							send_data
 					    fi;
 					    sleep 1;
 					done
@@ -364,7 +354,7 @@ frzr_deploy() {
 			fi
 			TASK_TRACKER=1 # Tell any listeners this task was completed, I'm not sure this variable will be needed in the end
 			send_data
-			echo "Entering Extract Case"
+
 			STATE="EXTRACT"
 			;;
 		"EXTRACT")
@@ -479,26 +469,24 @@ frzr_deploy() {
 
 			# Run frzr-initramfs to create mkinicpio.conf and build an initramfs
 			#frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
-			echo "Entering Cleanup Case"
+
 			STATE="CLEANUP"
 			;;
 		"CLEANUP")
 			TASK_STATE="CLEANUP"
 			send_data
-			# Delete the downloaded system img etc.
-			echo "Doing frzr-bootloader '${NAME}'"
+
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-			#local efi_update_result=$(frzr-bootloader "${NAME}")
-			frzr-bootloader "${NAME}"
-			#if echo "${efi_update_result}" | grep -q 'ERROR'; then
-			#	# bootloader configuration could not be updated
-			#	TASK_ERROR=1
-			#	TASK_ERROR_MSG="Could not update the EFI partition: ${efi_update_result}"
-			#	STATE="FAIL"
-			# send_data
-			#	continue
-			#fi
-			echo "Done frzr_sdboot"
+			local efi_update_result=$(frzr-bootloader "${NAME}")
+			if echo "${efi_update_result}" | grep -q 'ERROR'; then
+				# bootloader configuration could not be updated
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not update the EFI partition: ${efi_update_result}"
+				STATE="FAIL"
+				send_data
+				continue
+			fi
+
 			# Remove download artifacts (if any)
 			rm -f ${MOUNT_PATH}/*.img.*
 
@@ -524,7 +512,6 @@ frzr_deploy() {
 				continue
 			fi
 
-			echo "Doing btrfs subvolume set-default \"${subvolid}\" \"${MOUNT_PATH}\""
 			# Activates the new deployed image by making it the default btrfs subvolume
 			# systemd-equipped initramfs images will automount the default subvolume as the rootfs
 			TASK_MSG="Activating the new deployment (subvolid=${subvolid}) as the default subvolume"
@@ -536,12 +523,10 @@ frzr_deploy() {
 				send_data
 				continue
 			fi
-			echo "Done btrfs subvolume set-default"
 			
 			STATE="SUCCESS"
 			;;
 		"SUCCESS")
-			echo "Entering SUCCESS case"
 			# This state should only be used if the installation completed without errors
 			TASK_STATE="SUCCESS"
 
@@ -562,7 +547,6 @@ frzr_deploy() {
 			TASK_ERROR_MSG="Deploy hit an unexpected state"
 			TASK_ERROR=1
 			send_data
-			echo "ERROR: Something went terribly wrong in $(basename $0)"
 			RUNNING=false
 			;;
 		esac
