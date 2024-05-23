@@ -59,8 +59,6 @@ frzr_bootloader() {
 				sleep 5
 			fi
 
-			mount
-
 			STATE="CHECK"
 			;;
 
