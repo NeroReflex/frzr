@@ -54,12 +54,20 @@ while $RUNNING; do
 		STATE="BEGIN"
 		;;
 	"BEGIN")
-		MOUNT_PATH="/frzr_root"
-
+		local version=$(frzr-version)
+		if echo "${version}" | grep -Fqx "ERROR"; then
+			TASK_ERROR=1
+			TASK_ERROR_MSG="Could not fetch frzr version: ${version}"
+			STATE="FAIL"
+			send_data
+			continue
+		fi
+		
 		# Make sure the frzr_root is mounted during the deployment procedure
 		# this code is based on the fact that when a btrfs filesystem is created
 		# the default subvolid that is created contextually has the ID set to 256
 		# also as a matter of fact in btrfs is impossible to change subvolumes IDs
+		MOUNT_PATH="/frzr_root"
 		if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
 			MOUNT_PATH="/tmp/frzr_root"
 			#TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"

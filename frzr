@@ -117,10 +117,19 @@ elif [ $function == "kernel" ]; then
 elif [ $function == "release" ]; then
     source "${BASH_SOURCE%/*}/frzr-release" "$@"
 elif [ $function == "version" ]; then
-    echo "frzr-release"
-    #TODO Update frzr-release logic
-    #This probably should get the frzr version instead of the OS
-    #source frzr-release
+    frzr_check_bootenv
+    # We don't want to pass the function parameter to __frzr-version
+    shift
+
+    #flock -E 255 -n /tmp/frzr.lock "frzr-version" "$@"
+    source "${BASH_SOURCE%/*}/frzr-version" "$@"
+    RESULT=$?
+
+    #if [ $RESULT == 255 ]; then
+    #    echo "ERROR: $(basename $0) is already running"
+    #fi
+
+    exit $RESULT
 elif [ $function == "set-channel" ]; then
     echo "set channel"
     #TODO create frzr-channel to set target channel

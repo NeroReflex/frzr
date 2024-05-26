@@ -450,11 +450,13 @@ check_uefi() {
 # $1 the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
 # $2 the deployment subvolume
 # $3 frzr_root the mounted path to the main btrfs subvolume (the one that contains home as a subvolume)
+# $4 frzr version string
 # stdout "OK" on success, the error otherwise
 execute_migrations() {
-	local version=$1
+	local deployment_version=$1
 	local deployment=$2
 	local frzr_root=$3
+	local frzr_version=$4
 
 	if compgen -G "${deployment}"/usr/lib/frzr.d/*.migration >/dev/null; then
 		for m in "${deployment}"/usr/lib/frzr.d/*.migration; do
@@ -469,7 +471,7 @@ execute_migrations() {
 			# only execute migrations marked for newer frzr versions
 			if [ ! -z "$frzr_migration_version" ] && [ $frzr_migration_version -gt 0 ]; then
 				if [ "$(type -t post_install)" == function ] ; then
-					local install_migration_first_error=$(post_install "${frzr_root}" "${deployment}" "${version}")
+					local install_migration_first_error=$(post_install "${frzr_root}" "${deployment}" "${deployment_version}" "${frzr_version}")
 
 					if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
 						break
@@ -514,11 +516,13 @@ execute_migrations() {
 # $1 the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
 # $2 the mounted subvolume
 # $3 frzr_root the mounted path to the main btrfs subvolume (the one that contains home as a subvolume)
+# $4 frzr version string
 # stdout "OK" on success, the error otherwise
 execute_unlock() {
 	local version=$1
 	local deployment=$2
 	local frzr_root=$3
+	local frzr_version=$4
 
 	local error=""
 
@@ -569,11 +573,13 @@ execute_unlock() {
 # $1 the deployment version; this is also the deployment name (the name of the subvolume to be used as rootfs)
 # $2 the deployment subvolume
 # $3 frzr_root the mounted path to the main btrfs subvolume (the one that contains home as a subvolume)
+# $4 frzr version string
 # stdout "OK" on success, the error otherwise
 execute_removal() {
 	local version=$1
 	local deployment=$2
 	local frzr_root=$3
+	local frzr_version=$4
 
 	local error=""
 
@@ -590,7 +596,7 @@ execute_removal() {
 			if [ -z "${error}" ] && [ ! -z "${frzr_migration_version}" ] && [ $frzr_migration_version -gt 0 ]; then
 				if [ "$(type -t pre_removal)" == function ] ; then
 					echo "Running $m"
-					local unlock_script_result=$(pre_removal "${frzr_root}" "${deployment}" "${version}")
+					local unlock_script_result=$(pre_removal "${frzr_root}" "${deployment}" "${version}" "${frzr_version}")
 					if echo "${unlock_script_result}" | grep -Fqx "ERROR"; then
 						error="${unlock_script_result}"
 					fi
