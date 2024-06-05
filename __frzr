@@ -61,25 +61,43 @@ frzr_check_bootenv() {
     fi
 }
 
-frzr_chroot() {
+# Perform required mounts to have a working chroot environment
+# $1 the rootfs to be chrooted
+# stdout OK, an error otherwise
+frzr_mount_chroot() {
     local CHROOT_PATH=$1
+    
+    if mount -t proc /proc "${CHROOT_PATH}/proc"; then
+		if mount -t sysfs /sys "${CHROOT_PATH}/sys"; then
+			if mount --rbind /dev "${CHROOT_PATH}/dev"; then
+				echo "OK"
+			else
+				echo "ERROR: Could not bind-mount /dev to '${CHROOT_PATH}/dev'"
+			fi
+		else
+			echo "ERROR: Could not mount sysfs to '${CHROOT_PATH}/sys'"
+		fi
+	else
+		echo "ERROR: Could not mount proc to '${CHROOT_PATH}/proc'"
+	fi
+}
+
+frzr_exec_chroot() {
+	local CHROOT_PATH=$1
     local CHROOT_CMD=$2
 
-    mount -t proc /proc proc/
-    mount -t sysfs /sys sys/
-    mount --rbind /dev dev/
-
-    chroot ${CHROOT_PATH} /bin/bash <<EOF
+	chroot ${CHROOT_PATH} /bin/bash <<EOF
     ${CHROOT_CMD}
 EOF
 }
 
-frzr_undo_chroot() {
+frzr_umount_chroot() {
     local CHROOT_PATH=$1
-    umount -l ${CHROOT_PATH}/proc
-    umount -l ${CHROOT_PATH}/sys
-    mount --make-rslave ${CHROOT_PATH}/dev
-    umount -l ${CHROOT_PATH}/dev
+
+    umount -l "${CHROOT_PATH}/proc"
+    umount -l "${CHROOT_PATH}/sys"
+    mount --make-rslave "${CHROOT_PATH}/dev"
+    umount -l "${CHROOT_PATH}/dev"
 }
 
 # Get the UUID of the desk containing the given directory
@@ -458,49 +476,55 @@ execute_migrations() {
 	local frzr_root=$3
 	local frzr_version=$4
 
-	if compgen -G "${deployment}"/usr/lib/frzr.d/*.migration >/dev/null; then
-		for m in "${deployment}"/usr/lib/frzr.d/*.migration; do
-			unset frzr_migration_version
+	local $chroot_mount_res=$(frzr_mount_chroot "${deployment}")
 
-			unset -f post_install
-			unset -f chroot_post_install
+	if echo "${chroot_mount_res}" | grep -Fqx "ERROR"; then
+		echo "ERROR: Could not setup chroot: ${chroot_mount_res}"
+	else
+		if compgen -G "${deployment}"/usr/lib/frzr.d/*.migration >/dev/null; then
+			for m in "${deployment}"/usr/lib/frzr.d/*.migration; do
+				unset frzr_migration_version
 
-			# source the migration
-			. $m
+				unset -f post_install
+				unset -f chroot_post_install
 
-			# only execute migrations marked for newer frzr versions
-			if [ ! -z "$frzr_migration_version" ] && [ $frzr_migration_version -gt 0 ]; then
-				if [ "$(type -t post_install)" == function ] ; then
-					local install_migration_first_error=$(post_install "${frzr_root}" "${deployment}" "${deployment_version}" "${frzr_version}")
+				# source the migration
+				. $m
 
-					if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
-						break
+				# only execute migrations marked for newer frzr versions
+				if [ ! -z "$frzr_migration_version" ] && [ $frzr_migration_version -gt 0 ]; then
+					if [ "$(type -t post_install)" == function ] ; then
+						local install_migration_first_error=$(post_install "${frzr_root}" "${deployment}" "${deployment_version}" "${frzr_version}")
+
+						if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
+							break
+						fi
+					fi
+
+					if [ "$(type -t chroot_post_install)" == function ] ; then
+						# TODO: use something like arch-chroot to execute commands from the final image
+						local install_migration_first_error=$(frzr_exec_chroot "${deployment}" "/bin/bash <file> $1 $2 $3 $4")
+
+						if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
+							break
+						fi
 					fi
 				fi
 
-				if [ "$(type -t chroot_post_install)" == function ] ; then
-					# TODO: use something like arch-chroot to execute commands from the final image
-					local install_migration_first_error="OK"
+				unset -f post_install
+				unset -f chroot_post_install
 
-					if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
-						break
-					fi
-				fi
+				unset frzr_migration_version
+			done
+
+			if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
+				echo "ERROR: Could not execute migration '$m': ${install_migration_first_error}"
+			else
+				echo "OK"
 			fi
-
-			unset -f post_install
-			unset -f chroot_post_install
-
-			unset frzr_migration_version
-		done
-
-		if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
-			echo "ERROR: Could not execute migration '$m': ${install_migration_first_error}"
 		else
 			echo "OK"
 		fi
-	else
-		echo "OK"
 	fi
 }
 
