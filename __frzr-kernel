@@ -89,13 +89,14 @@ kernel() {
 			echo "Building ${KERNEL_NAME}..."
 
 			# Get the number of available cores
-			CORES=$(nproc)
+			local CORES=$(nproc)
+			local CORES_INT=$(echo $CORES | awk -F. '{print $1}')
 
 			# Decide the number of cores to use based on the condition
-			if [ $CORES -le 16 ]; then
-				MAKE_CORES=$CORES
+			if [ $CORES_INT -le 16 ]; then
+				MAKE_CORES=$CORES_INT
 			else
-				MAKE_CORES=$((CORES - 2))
+				MAKE_CORES=$((CORES_INT - 2))
 			fi
 
 			# Invoke make with the determined number of cores
