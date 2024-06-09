@@ -548,12 +548,26 @@ frzr_deploy() {
 			send_data
 
 			RUNNING=false
+
+			if [ -z ${SHOW_UI} ]; then
+				echo "Deployment is successful: reboot to boot into ${NAME}"
+			else
+				whiptail --msgbox "Deployment is successful: reboot to boot into ${NAME}" 8 48
+			fi
+			
 			;;
 		"FAIL")
 			TASK_STATE="FAIL"
 			TASK_ERROR=1
 			send_data
 			RUNNING=false
+
+			if [ -z ${SHOW_UI} ]; then
+				echo "Deployment failed: ${TASK_ERROR_MSG}"
+			else
+				whiptail --msgbox "Deployment failed: ${TASK_ERROR_MSG}" 8 48
+			fi
+
 			;;
 		*)
 			TASK_STATE="UNKNOWN_ERROR"
