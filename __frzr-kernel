@@ -55,6 +55,7 @@ kernel() {
 
 			if [ -d "${MOUNT_PATH}/kernels/usr" ]; then
 				MODULES_DIR="${MOUNT_PATH}/kernels"
+				KERNEL_OVERLAY_DIR="${MOUNT_PATH}/kernels"
 			else
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not find kernels overlay in '${MOUNT_PATH}/kernels/usr'"
@@ -95,12 +96,43 @@ kernel() {
 				continue
 			fi
 
+			STATE="INSTALL"
+			;;
+		"INSTALL")
+			KERNELRELEASE="${KERNEL_NAME}"
+			
+			# Install kernel modules
+			local modulesdir="${KERNEL_OVERLAY_DIR}/usr/modules/${KERNEL_NAME}"
+			mkdir -p "${modulesdir}"
+
+			# systemd expects to find the kernel here to allow hibernation
+			# https://github.com/systemd/systemd/commit/edda44605f06a41fb86b7ab8128dcf99161d2344
+			install -Dm644 "$(make -s image_name)" "$modulesdir/vmlinuz"
+
+			# Used by mkinitcpio to name the kernel
+			echo "$pkgbase" | install -Dm644 /dev/stdin "$modulesdir/pkgbase"
+
+			# Install modules suppressing depmod
+			ZSTD_CLEVEL=19 make INSTALL_MOD_PATH="${KERNEL_OVERLAY_DIR}/usr" INSTALL_MOD_STRIP=1 DEPMOD=/doesnt/exist modules_install
+
+			# remove build links
+			rm "$modulesdir"/build
+
+			# TODO: install headers too
+
 			STATE="INITRAMFS"
 			;;
 		"INITRAMFS")
 			# Generate the initramfs
-			if ! mkinitcpio -c "${BASH_SOURCE%/*}/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
+			if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
+				if ! mkinitcpio -c "${BASH_SOURCE%/*}/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
+					STATE="FAIL"
+				fi
+			else
+				TASK_ERROR=1
+				TASK_ERROR_MSG="ERROR: The new kernel has not been installed"
 				STATE="FAIL"
+				continue
 			fi
 
 			STATE="BOOTLOADER"
