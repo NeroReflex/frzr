@@ -106,12 +106,13 @@ elif [ $function == "kernel" ]; then
     shift
     source "${BASH_SOURCE%/*}/__frzr-kernel"
 
-    flock -E 255 -n /tmp/frzr.lock "kernel" "$@"
+    #flock -E 255 -n /tmp/frzr.lock "kernel" "$@"
+    source "${BASH_SOURCE%/*}/frzr-kernel" "$@"
     RESULT=$?
 
-    if [ $RESULT == 255 ]; then
-        echo "ERROR: $(basename $0) is already running"
-    fi
+    #if [ $RESULT == 255 ]; then
+    #    echo "ERROR: $(basename $0) is already running"
+    #fi
 
     exit $RESULT
 elif [ $function == "release" ]; then

@@ -54,10 +54,10 @@ while $RUNNING; do
 		STATE="BEGIN"
 		;;
 	"BEGIN")
-		local version=$(frzr-version)
-		if echo "${version}" | grep -Fqx "ERROR"; then
+		FRZR_VERSION=$(frzr-version)
+		if echo "${FRZR_VERSION}" | grep -Fqx "ERROR"; then
 			TASK_ERROR=1
-			TASK_ERROR_MSG="Could not fetch frzr version: ${version}"
+			TASK_ERROR_MSG="Could not fetch frzr version: ${FRZR_VERSION}"
 			STATE="FAIL"
 			send_data
 			continue
@@ -117,7 +117,7 @@ while $RUNNING; do
 		;;
 	"UNLOCK")
 		# set rootfs btrfs subvolume to read-write mode
-		UNLOCK_RESULT=$(execute_unlock "${NAME}" "${SUBVOL}" "${MOUNT_PATH}")
+		UNLOCK_RESULT=$(execute_unlock "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" "${FRZR_VERSION}")
 		if echo "${UNLOCK_RESULT}" | grep -q 'ERROR'; then
 			echo "frzr deployment ${NAME} unlock failed: ${UNLOCK_RESULT}"
 			STATE="FAIL"
