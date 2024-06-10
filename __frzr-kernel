@@ -19,7 +19,7 @@ kernel() {
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
-			if mount | grep -Fqx "${MOUNT_PATH}"; then
+			if mount | grep -Fq "${MOUNT_PATH}"; then
 				local MOUNTED_MOUNT_PATH="no"
 			else
 				MOUNT_PATH="/tmp/frzr_root"
@@ -38,7 +38,7 @@ kernel() {
 			# Make sure the EFI partition is mounted during the deployment procedure
 			EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
 
-			if mount | grep -Fqx "${EFI_MOUNT_PATH}"; then
+			if mount | grep -Fq "${EFI_MOUNT_PATH}"; then
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else
 				mkdir -p "${EFI_MOUNT_PATH}"

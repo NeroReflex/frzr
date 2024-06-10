@@ -41,7 +41,7 @@ frzr_deploy() {
 			TASK_MSG="Checking if the system has booted via UEFI"
 			send_data
 			check_uefi_result=$(check_uefi)
-			if echo "${check_uefi_result}" | grep -Fqx 'ERROR'; then
+			if echo "${check_uefi_result}" | grep -Fq 'ERROR'; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="UEFI boot check failed: ${check_uefi_result}"
 				STATE="FAIL"
@@ -86,7 +86,7 @@ frzr_deploy() {
 			send_data
 			
 			local version=$(frzr-version)
-			if echo "${version}" | grep -Fqx "ERROR"; then
+			if echo "${version}" | grep -Fq "ERROR"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not fetch frzr version: ${version}"
 				STATE="FAIL"
@@ -99,7 +99,7 @@ frzr_deploy() {
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
 			MOUNT_PATH="/frzr_root"
-			if mount | grep -Fqx "${MOUNT_PATH}"; then
+			if mount | grep -Fq "${MOUNT_PATH}"; then
 				local MOUNTED_MOUNT_PATH="no"
 			else
 				MOUNT_PATH="/tmp/frzr_root"
@@ -140,7 +140,7 @@ frzr_deploy() {
 			TASK_MSG="Preparing '${EFI_MOUNT_PATH}' to be used as the EFI System path"
 			send_data
 
-			if mount | grep -Fqx "${EFI_MOUNT_PATH}"; then
+			if mount | grep -Fq "${EFI_MOUNT_PATH}"; then
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else
 				mkdir -p "${EFI_MOUNT_PATH}"
@@ -166,7 +166,7 @@ frzr_deploy() {
 			# delete old deployments under these conditions:
 			# - the current deployment is known
 			# - the deployment is not currently running
-			if echo "${CURRENT}" | grep -Fqx 'ERROR'; then
+			if echo "${CURRENT}" | grep -Fq 'ERROR'; then
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Could not retrieve deployment to keep: ${CURRENT}"
 				send_data
@@ -179,9 +179,9 @@ frzr_deploy() {
 						local removal_deployment=$(basename "${deployment_to_be_removed}")
 						local removal_deployment_subvolid=$(btrfs_subvol_get_id "${deployment_to_be_removed}")
 
-						if echo "${removal_deployment}" | grep -Fqx "${CURRENT}"; then
+						if echo "${removal_deployment}" | grep -Fq "${CURRENT}"; then
 							echo "Deployment will be kept: '${removal_deployment}' is the current deployment"
-						elif echo "${removal_deployment_subvolid}" | grep -Fqx "ERROR"; then
+						elif echo "${removal_deployment_subvolid}" | grep -Fq "ERROR"; then
 							echo "Deployment will be kept: '${removal_deployment}' cannot get the subvolid and it's too risky"
 						# TODO: elif removal_deployment_subvolid==current_default_subvol
 						else
@@ -199,7 +199,7 @@ frzr_deploy() {
 							
 							# Delete deployment entries (this code is based on the fact that names of entries are generated as they are in prepare_efi_partition)
 							for entry_path in "${EFI_MOUNT_PATH}"/loader/entries/*.conf; do
-								if echo "${entry_path}" | grep -Fqx "${removal_deployment}"; then
+								if echo "${entry_path}" | grep -Fq "${removal_deployment}"; then
 									TASK_MSG="deleting deployment boot entry '${entry_path}'"
 									send_data
 									rm -f "${entry_path}"
@@ -210,7 +210,7 @@ frzr_deploy() {
 							TASK_MSG="Executing removal hooks"
 							send_data
 							local deployment_removal_hooks=$(execute_removal "${removal_deployment}" "${deployment_to_be_removed}" "${MOUNT_PATH}" "${version}")
-							if echo "${deployment_removal_hooks}" | grep -Fqx "ERROR"; then
+							if echo "${deployment_removal_hooks}" | grep -Fq "ERROR"; then
 								TASK_ERROR=1
 								TASK_ERROR_MSG="Removal hook on subvolume '${deployment_to_be_removed}' failed: ${deployment_removal_hooks}"
 								STATE="FAIL"
@@ -220,7 +220,7 @@ frzr_deploy() {
 
 							# Delete the deployment btrfs subvolume
 							local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${removal_deployment}")
-							if echo "${deployment_removal_result}" | grep -Fqx "ERROR"; then
+							if echo "${deployment_removal_result}" | grep -Fq "ERROR"; then
 								TASK_ERROR=1
 								TASK_ERROR_MSG="Could not delete the old deployment '${removal_deployment}'"
 								STATE="FAIL"
@@ -397,7 +397,7 @@ frzr_deploy() {
 			TASK_MSG="Extracting Image"
 			send_data
 			local install_result=$(install_image "${IMG_FILE}" "${DEPLOY_PATH}")
-			if echo "${install_result}" | grep -Fqx 'ERROR'; then
+			if echo "${install_result}" | grep -Fq 'ERROR'; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Error extracting the deployment image: ${install_result}"
 				STATE="FAIL"
@@ -441,7 +441,7 @@ frzr_deploy() {
 			if [ -d "${SUBVOL}"/usr/lib/frzr.d ]; then
 				TASK_MSG="Executing deployment migrations"
 				local migrations_result=$(execute_migrations "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" "${version}")
-				if echo "${migrations_result}" | grep -Fqx "ERROR"; then
+				if echo "${migrations_result}" | grep -Fq "ERROR"; then
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Migrations on subvolume '$SUBVOL' failed: ${migrations_result}"
 					STATE="FAIL"
@@ -507,7 +507,7 @@ frzr_deploy() {
 			TASK_MSG="Finding deployment subvolume ID"
 			send_data
 			local subvolid=$(btrfs_subvol_get_id "$SUBVOL")
-			if echo "$subvolid" | grep -Fqx "ERROR"; then
+			if echo "$subvolid" | grep -Fq "ERROR"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
 				STATE="FAIL"

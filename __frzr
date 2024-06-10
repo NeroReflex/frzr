@@ -182,7 +182,7 @@ btrfs_filtered_subvolume_recursive_delete() {
 	if [ -d "${dir}" ]; then
 		if is_btrfs_subvolume "${dir}"; then
 			local set_rw_res=$(btrfs_subvolume_set_rw "${subvol_path}")
-			if echo "${set_rw_res}" | grep -Fqx "ERROR"; then
+			if echo "${set_rw_res}" | grep -Fq "ERROR"; then
 				echo "ERROR: Could not set subvolume '"${dir}"' read-write: ${set_rw_res}"
 			else
 				btrfs subvolume list --sort=-path "${dir}" | grep "${expr}" | cut -d ' ' -f 9 | \
@@ -478,7 +478,7 @@ execute_migrations() {
 
 	local $chroot_mount_res=$(frzr_mount_chroot "${deployment}")
 
-	if echo "${chroot_mount_res}" | grep -Fqx "ERROR"; then
+	if echo "${chroot_mount_res}" | grep -Fq "ERROR"; then
 		echo "ERROR: Could not setup chroot: ${chroot_mount_res}"
 	else
 		if compgen -G "${deployment}"/usr/lib/frzr.d/*.migration >/dev/null; then
@@ -496,7 +496,7 @@ execute_migrations() {
 					if [ "$(type -t post_install)" == function ] ; then
 						local install_migration_first_error=$(post_install "${frzr_root}" "${deployment}" "${deployment_version}" "${frzr_version}")
 
-						if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
+						if echo "${install_migration_first_error}" | grep -Fq "ERROR"; then
 							break
 						fi
 					fi
@@ -505,7 +505,7 @@ execute_migrations() {
 						# TODO: use something like arch-chroot to execute commands from the final image
 						local install_migration_first_error=$(frzr_exec_chroot "${deployment}" "/bin/bash <file> $1 $2 $3 $4")
 
-						if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
+						if echo "${install_migration_first_error}" | grep -Fq "ERROR"; then
 							break
 						fi
 					fi
@@ -517,7 +517,7 @@ execute_migrations() {
 				unset frzr_migration_version
 			done
 
-			if echo "${install_migration_first_error}" | grep -Fqx "ERROR"; then
+			if echo "${install_migration_first_error}" | grep -Fq "ERROR"; then
 				echo "ERROR: Could not execute migration '$m': ${install_migration_first_error}"
 			else
 				echo "OK"
@@ -564,7 +564,7 @@ execute_unlock() {
 				if [ "$(type -t post_unlock)" == function ] ; then
 					echo "Running $m"
 					local unlock_script_result=$(post_unlock "${frzr_root}" "${deployment}" "${version}")
-					if echo "${unlock_script_result}" | grep -Fqx "ERROR"; then
+					if echo "${unlock_script_result}" | grep -Fq "ERROR"; then
 						error="${unlock_script_result}"
 					fi
 				else
@@ -621,7 +621,7 @@ execute_removal() {
 				if [ "$(type -t pre_removal)" == function ] ; then
 					echo "Running $m"
 					local unlock_script_result=$(pre_removal "${frzr_root}" "${deployment}" "${version}" "${frzr_version}")
-					if echo "${unlock_script_result}" | grep -Fqx "ERROR"; then
+					if echo "${unlock_script_result}" | grep -Fq "ERROR"; then
 						error="${unlock_script_result}"
 					fi
 				else
@@ -773,14 +773,26 @@ prepare_efi_partition() {
 				# each deployment will need its own kernel(s) as well as initramfs to boot: place them in a EFI subdirectory
 				mkdir -p ${efi_mount_path}/${version}
 
-				local amd_ucode="amd-ucode.img"
-				if [ -e "${boot_dir}/amd-ucode.img" ]; then
-					cp "${boot_dir}/amd-ucode.img" "${efi_mount_path}/${version}/${amd_ucode}"
+				# If the initramfs contains the AMD microcode spare space in /efi and do not copy it
+				if cat "${boot_dir}/${initramfs_file}" | cpio -itv | grep -Fq "AuthenticAMD.bin"; then
+					local amd_ucode="amd-ucode.img"
+				else
+					local amd_ucode="amd-ucode.img_excluded"
 				fi
 
-				local intel_ucode="intel-ucode.img"
-				if [ -e "${boot_dir}/intel-ucode.img" ]; then
-					cp "${boot_dir}/intel-ucode.img" "${efi_mount_path}/${version}/${intel_ucode}"
+				if [ -e "${boot_dir}/${amd_ucode}" ]; then
+					cp "${boot_dir}/${amd_ucode}" "${efi_mount_path}/${version}/${amd_ucode}"
+				fi
+
+				# If the initramfs contains the Intel microcode spare space in /efi and do not copy it
+				if cat "${boot_dir}/${initramfs_file}" | cpio -itv | grep -Fq "GenuineIntel.bin"; then
+					local intel_ucode="intel-ucode.img"
+				else
+					local intel_ucode="intel-ucode.img_excluded"
+				fi
+
+				if [ -e "${boot_dir}/${intel_ucode}" ]; then
+					cp "${boot_dir}/${intel_ucode}" "${efi_mount_path}/${version}/${intel_ucode}"
 				fi
 
 				if cp "${boot_dir}/${vmlinuz_file}" "${efi_mount_path}/${version}/${vmlinuz_file}"; then

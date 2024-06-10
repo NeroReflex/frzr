@@ -55,7 +55,7 @@ while $RUNNING; do
 		;;
 	"BEGIN")
 		FRZR_VERSION=$(frzr-version)
-		if echo "${FRZR_VERSION}" | grep -Fqx "ERROR"; then
+		if echo "${FRZR_VERSION}" | grep -Fq "ERROR"; then
 			TASK_ERROR=1
 			TASK_ERROR_MSG="Could not fetch frzr version: ${FRZR_VERSION}"
 			STATE="FAIL"

@@ -307,7 +307,7 @@ frzr_bootstrap() {
         "REPAIR")
             echo "We are doing a repair install"
             local repair_install_result=$(repair_install "${DISK}" "${MOUNT_PATH}")
-            if echo "$repair_install_result" | grep -Fqx "OK"; then
+            if echo "$repair_install_result" | grep -Fq "OK"; then
                 STATE="SUCCESS"
             else
                 STATE="FAIL"
