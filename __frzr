@@ -774,7 +774,7 @@ prepare_efi_partition() {
 				mkdir -p ${efi_mount_path}/${version}
 
 				# If the initramfs contains the AMD microcode spare space in /efi and do not copy it
-				if cat "${boot_dir}/${initramfs_file}" | cpio -itv | grep -Fq "AuthenticAMD.bin"; then
+				if cat "${boot_dir}/${initramfs_file}" | cpio -itv 2>/dev/null | grep -Fq "AuthenticAMD.bin"; then
 					local amd_ucode="amd-ucode.img"
 				else
 					local amd_ucode="amd-ucode.img_excluded"
@@ -785,7 +785,7 @@ prepare_efi_partition() {
 				fi
 
 				# If the initramfs contains the Intel microcode spare space in /efi and do not copy it
-				if cat "${boot_dir}/${initramfs_file}" | cpio -itv | grep -Fq "GenuineIntel.bin"; then
+				if cat "${boot_dir}/${initramfs_file}" | cpio -itv 2>/dev/null | grep -Fq "GenuineIntel.bin"; then
 					local intel_ucode="intel-ucode.img"
 				else
 					local intel_ucode="intel-ucode.img_excluded"
