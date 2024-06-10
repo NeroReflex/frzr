@@ -236,6 +236,13 @@ kernel() {
 				continue
 			fi
 
+			if ! cp "$modulesdir/vmlinuz" "${EFI_MOUNT_PATH}/vmlinuz-frzr"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="ERROR: Could not copy '$modulesdir/vmlinuz' to '${EFI_MOUNT_PATH}/vmlinuz-frzr'"
+				STATE="FAIL"
+				continue
+			fi
+
 			STATE="BOOTLOADER"
 			;;
 		"BOOTLOADER")
