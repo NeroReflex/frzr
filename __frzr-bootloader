@@ -16,6 +16,12 @@ frzr_bootloader() {
 	while $RUNNING; do
 		case "$STATE" in
 		"BEGIN")
+			# If the image is being built skip the bootloader generation
+			if [ ! -z "${FRZR_IMAGE_GENERATION}" ]; then
+				STATE="SUCCESS"
+				continue
+			fi
+
 			MOUNT_PATH="/frzr_root"
 			# Make sure the frzr_root is mounted during the deployment procedure
 			# this code is based on the fact that when a btrfs filesystem is created
@@ -187,7 +193,11 @@ frzr_bootloader() {
 			# This state should only be used if the unlock completed without errors
 			#TASK_STATE="SUCCESS"
 
-			echo "bootloader configuration update success"
+			if [ ! -z "${FRZR_IMAGE_GENERATION}" ]; then
+				echo "bootloader configuration update success"
+			else
+				echo "bootloader configuration update skipped"
+			fi
 
 			RUNNING=false
 			;;
