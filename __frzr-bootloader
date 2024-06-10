@@ -53,7 +53,7 @@ frzr_bootloader() {
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else
 				mkdir -p "${EFI_MOUNT_PATH}"
-				if mount -L frzr_efi "${EFI_MOUNT_PATH}"; then
+				if mount -L frzr_efi -o uid=0,gid=0,fmask=0077,dmask=0077 "${EFI_MOUNT_PATH}"; then
 					local MOUNTED_EFI_MOUNT_PATH="yes"
 				else
 					local MOUNTED_EFI_MOUNT_PATH="no"
