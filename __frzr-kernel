@@ -81,10 +81,13 @@ kernel() {
 			# Fetch the name of the kernel (uname -r)
 			KERNEL_NAME=$(make -s kernelrelease)
 
-			echo "Checking for pre-installed kernel"
-			if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
-				
-			fi
+			#echo "Checking for pre-installed kernel"
+			#if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
+			#	TASK_ERROR=1
+			#	TASK_ERROR_MSG="ERROR: Kernel ${KERNEL_NAME} already exists"
+			#	STATE="FAIL"
+			#	continue
+			#fi
 
 			echo "Building ${KERNEL_NAME}..."
 
