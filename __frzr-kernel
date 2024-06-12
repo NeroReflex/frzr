@@ -179,9 +179,11 @@ frzr_kernel() {
 			# Install build files
 			sudo install -Dt "$builddir" -m644 .config Makefile Module.symvers System.map version vmlinux
 
-			for localversion in localversion.*; do
-				sudo install -Dt "$builddir" -m644 "${localversion}"
-			done
+			if ls -lah | grep -Fq "localversion."; then
+				for localversion in localversion.*; do
+					sudo install -Dt "$builddir" -m644 "${localversion}"
+				done
+			fi
 
 			sudo install -Dt "$builddir/kernel" -m644 kernel/Makefile
 			sudo install -Dt "$builddir/arch/x86" -m644 arch/x86/Makefile
@@ -298,7 +300,7 @@ frzr_kernel() {
 				fi
 			else
 				TASK_ERROR=1
-				TASK_ERROR_MSG="ERROR: The new kernel has not been installed"
+				TASK_ERROR_MSG="ERROR: The new kernel has not been installed: '/usr/lib/modules/${KERNEL_NAME}' not found"
 				STATE="FAIL"
 				send_data
 				continue
