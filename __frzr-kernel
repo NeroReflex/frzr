@@ -72,14 +72,39 @@ frzr_kernel() {
 				TASK_ERROR_MSG="Could not find kernel configuration"
 				STATE="FAIL"
 				continue
+			else
+				cp .config .config.pre
 			fi
 			
 			STATE="BUILD"
 			;;
 		
 		"BUILD")
+			if ! make defconfig; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not execute defconfig (1)"
+				STATE="FAIL"
+				continue
+			fi
+
 			# Fetch the name of the kernel (uname -r)
 			KERNEL_NAME=$(make -s kernelrelease)
+
+			if ! make defconfig; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not execute defconfig (2)"
+				STATE="FAIL"
+				continue
+			fi
+
+			if ! make KERNELRELEASE="${KERNEL_NAME}" mrproper; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not execute mrproper"
+				STATE="FAIL"
+				continue
+			fi
+
+			cp .config.pre .config
 
 			#echo "Checking for pre-installed kernel"
 			#if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
