@@ -1,15 +1,10 @@
 #! /bin/bash
 
-if [ $EUID -ne 0 ]; then
-	echo "$(basename $0) must be run as root"
-	exit 1
-fi
+source "${BASH_SOURCE%/*}/__frzr-kernel"
 
-flock -E 255 -n "/tmp/frzr-kernel.lock" ${BASH_SOURCE%/*}/__frzr-kernel $@
-RESULT=$?
+# TODO: check the file lock exists
 
-if [ $RESULT == 255 ]; then
-	echo "$(basename $0) is already running"
-fi
-
-exit $RESULT
+frzr_kernel "$@"
+# We don't need to check the exit status here because this is being ran and handled in frzr
+# RESULT=$?
+# exit $RESULT

@@ -99,9 +99,6 @@ elif [ $function == "kernel" ]; then
     frzr_check_bootenv
     # We don't want to pass the function parameter to __frzr-kernel
     shift
-    source "${BASH_SOURCE%/*}/__frzr-kernel"
-
-    #flock -E 255 -n /tmp/frzr.lock "kernel" "$@"
     source "${BASH_SOURCE%/*}/frzr-kernel" "$@"
     RESULT=$?
 

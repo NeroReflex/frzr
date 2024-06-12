@@ -1,11 +1,11 @@
 #! /bin/bash
 
-set -e
+set -o pipefail
 
 # import methods
 #source "${BASH_SOURCE%/*}/__frzr" "$@"
 
-kernel() {
+frzr_kernel() {
 	local KERNEL_NAME=""
 
 	RUNNING=true
@@ -67,7 +67,7 @@ kernel() {
 			;;
 
 		"DOWNLOAD")
-			if [ -f ".config" ]; then
+			if [ ! -f ".config" ]; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not find kernel configuration"
 				STATE="FAIL"
