@@ -25,11 +25,12 @@ frzr_kernel() {
 				MOUNT_PATH="/tmp/frzr_root"
 				#TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				mkdir -p "${MOUNT_PATH}"
-				if mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"; then
+				if sudo mount -L frzr_root -t btrfs -o subvolid=5,rw "${MOUNT_PATH}"; then
 					local MOUNTED_MOUNT_PATH="yes"
 				else
 					echo "frzr-kernel failed: could not mount frzr_root"
 					STATE="FAIL"
+					send_data
 					continue
 				fi
 				sleep 5
@@ -41,13 +42,14 @@ frzr_kernel() {
 			if mount | grep -Fq "${EFI_MOUNT_PATH}"; then
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else
-				mkdir -p "${EFI_MOUNT_PATH}"
-				if mount -L frzr_efi -o uid=0,gid=0,fmask=0077,dmask=0077 "${EFI_MOUNT_PATH}"; then
+				sudo mkdir -p "${EFI_MOUNT_PATH}"
+				if sudo mount -L frzr_efi -o uid=0,gid=0,fmask=0077,dmask=0077 "${EFI_MOUNT_PATH}"; then
 					local MOUNTED_EFI_MOUNT_PATH="yes"
 				else
 					TASK_ERROR=1
 					TASK_ERROR_MSG="Could not bind ${EFI_MOUNT_PATH} to frzr_efi (boot) partition"
 					STATE="FAIL"
+					send_data
 					continue
 				fi
 				sleep 5
@@ -60,6 +62,7 @@ frzr_kernel() {
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not find kernels overlay in '${MOUNT_PATH}/kernels/usr'"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 
@@ -71,6 +74,7 @@ frzr_kernel() {
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not find kernel configuration"
 				STATE="FAIL"
+				send_data
 				continue
 			else
 				cp .config .config.pre
@@ -84,6 +88,7 @@ frzr_kernel() {
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not execute defconfig (1)"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 
@@ -94,15 +99,18 @@ frzr_kernel() {
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not execute defconfig (2)"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 
-			if ! make KERNELRELEASE="${KERNEL_NAME}" mrproper; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not execute mrproper"
-				STATE="FAIL"
-				continue
-			fi
+			# This will perform a clean of previous build artifacts
+			#if ! make KERNELRELEASE="${KERNEL_NAME}" mrproper; then
+			#	TASK_ERROR=1
+			#	TASK_ERROR_MSG="Could not execute mrproper"
+			#	STATE="FAIL"
+			#	send_data
+			#	continue
+			#fi
 
 			cp .config.pre .config
 
@@ -132,6 +140,7 @@ frzr_kernel() {
 				TASK_ERROR=1
 				TASK_ERROR_MSG="ERROR: Compilation of linux-${KERNEL_NAME} failed"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 
@@ -258,11 +267,14 @@ frzr_kernel() {
 			if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
 				if ! sudo mkinitcpio -c "${BASH_SOURCE%/*}/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
 					STATE="FAIL"
+					send_data
+					continue
 				fi
 			else
 				TASK_ERROR=1
 				TASK_ERROR_MSG="ERROR: The new kernel has not been installed"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 
@@ -270,13 +282,36 @@ frzr_kernel() {
 				TASK_ERROR=1
 				TASK_ERROR_MSG="ERROR: Could not copy '$modulesdir/vmlinuz' to '${EFI_MOUNT_PATH}/vmlinuz-frzr'"
 				STATE="FAIL"
+				send_data
 				continue
 			fi
 
 			STATE="BOOTLOADER"
 			;;
 		"BOOTLOADER")
-			# TODO: write "${EFI_MOUNT_PATH}/loader/entries/frzr_kernel.conf"
+			# Write "${EFI_MOUNT_PATH}/loader/entries/frzr_kernel.conf" so that frzr will make use of the new kernel
+			# WARNING: version being empty has special meaning
+			# WARNING: btrfs_rootfs_uuid being empty means gpt-auto will be used
+			local boot_entry_generation_res=$(generate_systemd_boot_cfg "" "frzr_kernel.conf" "frzr-kernel" "${EFI_MOUNT_PATH}" "no_ucode" "no_ucode" "vmlinuz-frzr" "initramfs-frzr.img" "" "")
+			if echo "${boot_entry_generation_res}" | grep -Fq "ERROR"; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not generate systemd-boot entry: ${boot_entry_generation_res}"
+				STATE="FAIL"
+				send_data
+				continue
+			fi
+			
+			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
+			local efi_update_result=$(frzr-bootloader)
+			if echo "${efi_update_result}" | grep -Fq 'ERROR'; then
+				# bootloader configuration could not be updated
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not update the EFI partition: ${efi_update_result}"
+				STATE="FAIL"
+				send_data
+				continue
+			fi
+			
 			STATE="SUCCESS"
 			;;
 		"SUCCESS")

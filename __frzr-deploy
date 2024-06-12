@@ -491,7 +491,7 @@ frzr_deploy() {
 
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
 			local efi_update_result=$(frzr-bootloader "${NAME}")
-			if echo "${efi_update_result}" | grep -q 'ERROR'; then
+			if echo "${efi_update_result}" | grep -Fq 'ERROR'; then
 				# bootloader configuration could not be updated
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not update the EFI partition: ${efi_update_result}"
