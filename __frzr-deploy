@@ -506,7 +506,7 @@ frzr_deploy() {
 			# Get the subvolid: this will be used in generating the systemd-boot entry and setting is as the default for the automatic boot
 			TASK_MSG="Finding deployment subvolume ID"
 			send_data
-			local subvolid=$(btrfs_subvol_get_id "$SUBVOL")
+			local subvolid=$(btrfs_subvol_get_id "${SUBVOL}")
 			if echo "$subvolid" | grep -Fq "ERROR"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
@@ -535,6 +535,13 @@ frzr_deploy() {
 				STATE="FAIL"
 				send_data
 				continue
+			fi
+
+			# Lazy umount the deployed system
+			TASK_MSG="Post-install umount of '${SUBVOL}'"
+			send_data
+			if mount | grep -Fq "${SUBVOL}"; then
+				umount -l -R "${SUBVOL}"
 			fi
 			
 			STATE="SUCCESS"
