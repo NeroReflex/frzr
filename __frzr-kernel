@@ -175,7 +175,12 @@ frzr_kernel() {
 			sudo mkdir -p "${builddir}"
 
 			# Install build files
-			sudo install -Dt "$builddir" -m644 .config Makefile Module.symvers System.map localversion.* version vmlinux
+			sudo install -Dt "$builddir" -m644 .config Makefile Module.symvers System.map version vmlinux
+
+			for localversion in localversion.*; do
+				sudo install -Dt "$builddir" -m644 "${localversion}"
+			done
+
 			sudo install -Dt "$builddir/kernel" -m644 kernel/Makefile
 			sudo install -Dt "$builddir/arch/x86" -m644 arch/x86/Makefile
 			sudo cp -t "$builddir" -a scripts
@@ -191,19 +196,38 @@ frzr_kernel() {
 			sudo cp -t "$builddir/arch/x86" -a arch/x86/include
 			sudo install -Dt "$builddir/arch/x86/kernel" -m644 arch/x86/kernel/asm-offsets.s
 
-			sudo install -Dt "$builddir/drivers/md" -m644 drivers/md/*.h
-			sudo install -Dt "$builddir/net/mac80211" -m644 net/mac80211/*.h
+			# sudo install -Dt "$builddir/drivers/md" -m644 drivers/md/*.h
+			for file in drivers/md/*.h; do
+				sudo install -Dt "$builddir/drivers/md" -m644 "$file"
+			done
+
+			# sudo install -Dt "$builddir/net/mac80211" -m644 net/mac80211/*.h
+			for file in net/mac80211/*.h; do
+				sudo install -Dt "$builddir/net/mac80211" -m644 "$file"
+			done
 
 			# https://bugs.archlinux.org/task/13146
 			sudo install -Dt "$builddir/drivers/media/i2c" -m644 drivers/media/i2c/msp3400-driver.h
 
 			# https://bugs.archlinux.org/task/20402
-			sudo install -Dt "$builddir/drivers/media/usb/dvb-usb" -m644 drivers/media/usb/dvb-usb/*.h
-			sudo install -Dt "$builddir/drivers/media/dvb-frontends" -m644 drivers/media/dvb-frontends/*.h
-			sudo install -Dt "$builddir/drivers/media/tuners" -m644 drivers/media/tuners/*.h
+			# sudo install -Dt "$builddir/drivers/media/usb/dvb-usb" -m644 drivers/media/usb/dvb-usb/*.h
+			for file in drivers/media/usb/dvb-usb/*.h; do
+				sudo install -Dt "$builddir/drivers/media/usb/dvb-usb" -m644 "$file"
+			done
+			# sudo install -Dt "$builddir/drivers/media/dvb-frontends" -m644 drivers/media/dvb-frontends/*.h
+			for file in drivers/media/dvb-frontends/*.h; do
+				sudo install -Dt "$builddir/drivers/media/dvb-frontends" -m644 "$file"
+			done
+			# sudo install -Dt "$builddir/drivers/media/tuners" -m644 drivers/media/tuners/*.h
+			for file in drivers/media/tuners/*.h; do
+				sudo install -Dt "$builddir/drivers/media/tuners" -m644 "$file"
+			done
 
 			# https://bugs.archlinux.org/task/71392
-			sudo install -Dt "$builddir/drivers/iio/common/hid-sensors" -m644 drivers/iio/common/hid-sensors/*.h
+			# sudo install -Dt "$builddir/drivers/iio/common/hid-sensors" -m644 drivers/iio/common/hid-sensors/*.h
+			for file in drivers/iio/common/hid-sensors/*.h; do
+				sudo install -Dt "$builddir/drivers/iio/common/hid-sensors" -m644 "$file"
+			done
 
 			# Install Kconfig files
 			sudo find . -name 'Kconfig*' -exec install -Dm644 {} "$builddir/{}" \;
@@ -289,6 +313,17 @@ frzr_kernel() {
 			STATE="BOOTLOADER"
 			;;
 		"BOOTLOADER")
+			# Read additional boot arguments (to be added to the kernel cmdline) from the user file
+			local additional_arguments=""
+			if [ -f "${EFI_MOUNT_PATH}/frzr_bootconfig.conf" ]; then
+				local user_bootconf_args=$(cat "${EFI_MOUNT_PATH}/frzr_bootconfig.conf") 
+				additional_arguments="$additional_arguments ${user_bootconf_args}"
+			else
+				TASK_WARNING=1
+				TASK_WARNING_MSG="Could not read '${EFI_MOUNT_PATH}/frzr_bootconfig.conf': deployment cmdline will be used"
+				send_data
+			fi
+
 			# Write "${EFI_MOUNT_PATH}/loader/entries/frzr_kernel.conf" so that frzr will make use of the new kernel
 			# WARNING: version being empty has special meaning
 			# WARNING: btrfs_rootfs_uuid being empty means gpt-auto will be used
