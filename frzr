@@ -2,11 +2,6 @@
 
 set -Ee
 
-if [ $EUID -ne 0 ]; then
-    echo "$(basename $0) must be run as root"
-    exit 1
-fi
-
 # Import methods
 source "${BASH_SOURCE%/*}/__frzr" "$@"
 

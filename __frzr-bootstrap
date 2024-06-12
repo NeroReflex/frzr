@@ -251,6 +251,17 @@ frzr_bootstrap() {
     while $RUNNING; do
         case "$STATE" in
         "FRZR_BOOTSTRAP_CHECK")
+		
+			TASK_MSG="Checking for root privileges"
+			send_data
+			if [ $EUID -ne 0 ]; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="$(basename $0) not run as root"
+				STATE="FAIL"
+				send_data
+				continue
+			fi
+
             echo "Checking for drives connected to the system"
             MOUNT_PATH=/tmp/frzr_root
             device_list=()
