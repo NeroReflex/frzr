@@ -103,6 +103,8 @@ frzr_kernel() {
 				continue
 			fi
 
+			echo "${KERNEL_NAME}" > version
+
 			# This will perform a clean of previous build artifacts
 			#if ! make KERNELRELEASE="${KERNEL_NAME}" mrproper; then
 			#	TASK_ERROR=1
