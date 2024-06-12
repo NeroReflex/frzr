@@ -118,13 +118,11 @@ while $RUNNING; do
 	"UNLOCK")
 		# set rootfs btrfs subvolume to read-write mode
 		UNLOCK_RESULT=$(execute_unlock "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" "${FRZR_VERSION}")
-		if echo "${UNLOCK_RESULT}" | grep -q 'ERROR'; then
+		if echo "${UNLOCK_RESULT}" | grep -Fq 'ERROR'; then
 			echo "frzr deployment ${NAME} unlock failed: ${UNLOCK_RESULT}"
 			STATE="FAIL"
 			continue
 		fi
-
-		echo "${UNLOCK_RESULT}"
 
 		systemctl daemon-reload
 
@@ -143,7 +141,7 @@ while $RUNNING; do
 
 		#TASK_STATE="FAIL"
 
-		echo "frzr-unlock failed: ${NAME}"
+		echo "frzr-unlock failed for deployment ${NAME}: ${UNLOCK_RESULT}"
 
 		RUNNING=false
 		;;

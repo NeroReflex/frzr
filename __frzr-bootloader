@@ -216,9 +216,9 @@ frzr_bootloader() {
 			#TASK_STATE="SUCCESS"
 
 			if [ ! -z "${FRZR_IMAGE_GENERATION}" ]; then
-				echo "bootloader configuration update success"
-			else
 				echo "bootloader configuration update skipped"
+			else
+				echo "bootloader configuration update success"
 			fi
 
 			RUNNING=false

@@ -488,8 +488,9 @@ execute_migrations() {
 			# only execute migrations marked for newer frzr versions
 			if [ ! -z "$frzr_migration_version" ] && [ $frzr_migration_version -gt 0 ]; then
 				if [ "$(type -t post_install)" == function ] ; then
-					local install_migration_first_error=$(post_install "${frzr_root}" "${deployment}" "${deployment_version}" "${frzr_version}")
 
+					# Run migration and check for errors
+					local install_migration_first_error=$(post_install "${frzr_root}" "${deployment}" "${deployment_version}" "${frzr_version}")
 					if echo "${install_migration_first_error}" | grep -Fq "ERROR"; then
 						break
 					fi
@@ -545,7 +546,8 @@ execute_unlock() {
 			# only execute unlock scripts marked for newer frzr versions
 			if [ -z "${error}" ] && [ ! -z "${frzr_migration_version}" ] && [ $frzr_migration_version -gt 0 ]; then
 				if [ "$(type -t post_unlock)" == function ] ; then
-					echo "Running $m"
+
+					# Run migration and check for errors
 					local unlock_script_result=$(post_unlock "${frzr_root}" "${deployment}" "${version}")
 					if echo "${unlock_script_result}" | grep -Fq "ERROR"; then
 						error="${unlock_script_result}"
