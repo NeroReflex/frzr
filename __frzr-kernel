@@ -167,7 +167,7 @@ frzr_kernel() {
 			sudo ZSTD_CLEVEL=19 make KERNELRELEASE="${KERNEL_NAME}" INSTALL_MOD_PATH="${KERNEL_OVERLAY_DIR}/usr" INSTALL_MOD_STRIP=1 DEPMOD=/doesnt/exist modules_install
 
 			# remove build links
-			sudo rm "$modulesdir"/build
+			#sudo rm "${modulesdir}/build" # rm: cannot remove '/frzr_root/kernels/usr/lib/modules/6.1.81-valve17-chos2-xanmod1-rt26-02177-gcd49a1c8282f/build': Is a directory
 
 			# Install api-headers (taken from _package-api-headers)
 			sudo make KERNELRELEASE="${KERNEL_NAME}" INSTALL_HDR_PATH="${KERNEL_OVERLAY_DIR}/usr" headers_install
