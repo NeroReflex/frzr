@@ -832,6 +832,11 @@ prepare_efi_partition() {
 		else
 			echo "default ${default_boot_cfg}" > "${efi_mount_path}/loader/loader.conf"
 
+			# If frzr-kernel has been used this is a development machine: add a boot timeout so that different kernels can be used
+			if [ "${default_boot_cfg}" = "frzr_kernel.conf" ]; then
+				echo "timeout 3" >> "${efi_mount_path}/loader/loader.conf"
+			fi
+
 			echo "OK"
 		fi
 	fi
