@@ -745,6 +745,11 @@ prepare_efi_partition() {
 			# Extract the matching part of the filename and remove the .img extension
 			kernel_version=$(basename "${vmlinuz_file_path}" | sed 's/^vmlinuz-//')
 
+			# Check if the file really is a linux kernel
+			if ! file -bL "${vmlinuz_file_path}" | grep -Fq "Linux kernel"; then
+				continue
+			fi
+
 			# $initramfs_file is the initramfs name of the file in /boot: find the corresponding vmlinuz file
 			initramfs_file="initramfs-${kernel_version}.img"
 			
