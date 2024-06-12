@@ -140,7 +140,7 @@ frzr_kernel() {
 		"INSTALL")
 			
 			# Install kernel modules (taken from _package)
-			local modulesdir="${KERNEL_OVERLAY_DIR}/usr/modules/${KERNEL_NAME}"
+			local modulesdir="${KERNEL_OVERLAY_DIR}/usr/lib/modules/${KERNEL_NAME}"
 			mkdir -p "${modulesdir}"
 
 			# systemd expects to find the kernel here to allow hibernation
