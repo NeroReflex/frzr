@@ -141,78 +141,80 @@ frzr_kernel() {
 			
 			# Install kernel modules (taken from _package)
 			local modulesdir="${KERNEL_OVERLAY_DIR}/usr/lib/modules/${KERNEL_NAME}"
-			mkdir -p "${modulesdir}"
+			sudo mkdir -p "${modulesdir}"
 
 			# systemd expects to find the kernel here to allow hibernation
 			# https://github.com/systemd/systemd/commit/edda44605f06a41fb86b7ab8128dcf99161d2344
-			install -Dm644 "$(make -s KERNELRELEASE="${KERNEL_NAME}" image_name)" "$modulesdir/vmlinuz"
+			sudo install -Dm644 "$(make -s KERNELRELEASE="${KERNEL_NAME}" image_name)" "$modulesdir/vmlinuz"
 
 			# Used by mkinitcpio to name the kernel
-			echo "$pkgbase" | install -Dm644 /dev/stdin "$modulesdir/pkgbase"
+			echo "$${KERNEL_NAME}" > pkgbase
+			sudo install -Dm644 pkgbase "$modulesdir/pkgbase"
+			rm pkgbase
 
 			# Install modules suppressing depmod
-			ZSTD_CLEVEL=19 make KERNELRELEASE="${KERNEL_NAME}" INSTALL_MOD_PATH="${KERNEL_OVERLAY_DIR}/usr" INSTALL_MOD_STRIP=1 DEPMOD=/doesnt/exist modules_install
+			sudo ZSTD_CLEVEL=19 make KERNELRELEASE="${KERNEL_NAME}" INSTALL_MOD_PATH="${KERNEL_OVERLAY_DIR}/usr" INSTALL_MOD_STRIP=1 DEPMOD=/doesnt/exist modules_install
 
 			# remove build links
-			rm "$modulesdir"/build
+			sudo rm "$modulesdir"/build
 
 			# Install api-headers (taken from _package-api-headers)
-			make KERNELRELEASE="${KERNEL_NAME}" INSTALL_HDR_PATH="${KERNEL_OVERLAY_DIR}/usr" headers_install
+			sudo make KERNELRELEASE="${KERNEL_NAME}" INSTALL_HDR_PATH="${KERNEL_OVERLAY_DIR}/usr" headers_install
 
 			# Install kernel headers (taken from _package-headers)
 			local builddir="${KERNEL_OVERLAY_DIR}/usr/lib/modules/${KERNEL_NAME}/build"
-			mkdir -p "${builddir}"
+			sudo mkdir -p "${builddir}"
 
 			# Install build files
-			install -Dt "$builddir" -m644 .config Makefile Module.symvers System.map localversion.* version vmlinux
-			install -Dt "$builddir/kernel" -m644 kernel/Makefile
-			install -Dt "$builddir/arch/x86" -m644 arch/x86/Makefile
-			cp -t "$builddir" -a scripts
+			sudo install -Dt "$builddir" -m644 .config Makefile Module.symvers System.map localversion.* version vmlinux
+			sudo install -Dt "$builddir/kernel" -m644 kernel/Makefile
+			sudo install -Dt "$builddir/arch/x86" -m644 arch/x86/Makefile
+			sudo cp -t "$builddir" -a scripts
 
 			# required when STACK_VALIDATION is enabled
-			install -Dt "$builddir/tools/objtool" tools/objtool/objtool
+			sudo install -Dt "$builddir/tools/objtool" tools/objtool/objtool
 
 			# required when DEBUG_INFO_BTF_MODULES is enabled
-			install -Dt "$builddir/tools/bpf/resolve_btfids" tools/bpf/resolve_btfids/resolve_btfids
+			sudo install -Dt "$builddir/tools/bpf/resolve_btfids" tools/bpf/resolve_btfids/resolve_btfids
 
 			# Install headers
-			cp -t "$builddir" -a include
-			cp -t "$builddir/arch/x86" -a arch/x86/include
-			install -Dt "$builddir/arch/x86/kernel" -m644 arch/x86/kernel/asm-offsets.s
+			sudo cp -t "$builddir" -a include
+			sudo cp -t "$builddir/arch/x86" -a arch/x86/include
+			sudo install -Dt "$builddir/arch/x86/kernel" -m644 arch/x86/kernel/asm-offsets.s
 
-			install -Dt "$builddir/drivers/md" -m644 drivers/md/*.h
-			install -Dt "$builddir/net/mac80211" -m644 net/mac80211/*.h
+			sudo install -Dt "$builddir/drivers/md" -m644 drivers/md/*.h
+			sudo install -Dt "$builddir/net/mac80211" -m644 net/mac80211/*.h
 
 			# https://bugs.archlinux.org/task/13146
-			install -Dt "$builddir/drivers/media/i2c" -m644 drivers/media/i2c/msp3400-driver.h
+			sudo install -Dt "$builddir/drivers/media/i2c" -m644 drivers/media/i2c/msp3400-driver.h
 
 			# https://bugs.archlinux.org/task/20402
-			install -Dt "$builddir/drivers/media/usb/dvb-usb" -m644 drivers/media/usb/dvb-usb/*.h
-			install -Dt "$builddir/drivers/media/dvb-frontends" -m644 drivers/media/dvb-frontends/*.h
-			install -Dt "$builddir/drivers/media/tuners" -m644 drivers/media/tuners/*.h
+			sudo install -Dt "$builddir/drivers/media/usb/dvb-usb" -m644 drivers/media/usb/dvb-usb/*.h
+			sudo install -Dt "$builddir/drivers/media/dvb-frontends" -m644 drivers/media/dvb-frontends/*.h
+			sudo install -Dt "$builddir/drivers/media/tuners" -m644 drivers/media/tuners/*.h
 
 			# https://bugs.archlinux.org/task/71392
-			install -Dt "$builddir/drivers/iio/common/hid-sensors" -m644 drivers/iio/common/hid-sensors/*.h
+			sudo install -Dt "$builddir/drivers/iio/common/hid-sensors" -m644 drivers/iio/common/hid-sensors/*.h
 
 			# Install Kconfig files
-			find . -name 'Kconfig*' -exec install -Dm644 {} "$builddir/{}" \;
+			sudo find . -name 'Kconfig*' -exec install -Dm644 {} "$builddir/{}" \;
 
 			# Remove unneeded architectures
 			local arch
 			for arch in "$builddir"/arch/*/; do
 				[[ $arch = */x86/ ]] && continue
 				echo "Removing $(basename "$arch")"
-				rm -r "$arch"
+				sudo rm -r "$arch"
 			done
 
 			# Remove documentation
-			rm -r "$builddir/Documentation"
+			sudo rm -r "$builddir/Documentation"
 
 			# Remove broken  symlinks
-			find -L "$builddir" -type l -printf 'Removing %P\n' -delete
+			sudo find -L "$builddir" -type l -printf 'Removing %P\n' -delete
 
 			# Remove loose objects
-			find "$builddir" -type f -name '*.o' -printf 'Removing %P\n' -delete
+			sudo find "$builddir" -type f -name '*.o' -printf 'Removing %P\n' -delete
 
 			if [ -z "${STRIP_STATIC}" ]; then
 				local STRIP_STATIC="--strip-debug"
@@ -231,30 +233,30 @@ frzr_kernel() {
 			while read -rd '' file; do
 				case "$(file -Sib "$file")" in
 				application/x-sharedlib\;*)      # Libraries (.so)
-					strip -v $STRIP_SHARED "$file" ;;
+					sudo strip -v $STRIP_SHARED "$file" ;;
 				application/x-archive\;*)        # Libraries (.a)
-					strip -v $STRIP_STATIC "$file" ;;
+					sudo strip -v $STRIP_STATIC "$file" ;;
 				application/x-executable\;*)     # Binaries
-					strip -v $STRIP_BINARIES "$file" ;;
+					sudo strip -v $STRIP_BINARIES "$file" ;;
 				application/x-pie-executable\;*) # Relocatable binaries
-					strip -v $STRIP_SHARED "$file" ;;
+					sudo strip -v $STRIP_SHARED "$file" ;;
 				esac
-			done < <(find "$builddir" -type f -perm -u+x ! -name vmlinux -print0)
+			done < <(sudo find "$builddir" -type f -perm -u+x ! -name vmlinux -print0)
 
 			# Strip vmlinux
-			strip -v $STRIP_STATIC "$builddir/vmlinux"
+			sudo strip -v $STRIP_STATIC "$builddir/vmlinux"
 
 			# Add symlinks
-			mkdir -p "${KERNEL_OVERLAY_DIR}/usr/src"
+			sudo mkdir -p "${KERNEL_OVERLAY_DIR}/usr/src"
 
-			ln -sr "$builddir" "${KERNEL_OVERLAY_DIR}/usr/src/${KERNEL_NAME}"
+			sudo ln -sr "$builddir" "${KERNEL_OVERLAY_DIR}/usr/src/${KERNEL_NAME}"
 
 			STATE="INITRAMFS"
 			;;
 		"INITRAMFS")
 			# Generate the initramfs
 			if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
-				if ! mkinitcpio -c "${BASH_SOURCE%/*}/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
+				if ! sudo mkinitcpio -c "${BASH_SOURCE%/*}/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
 					STATE="FAIL"
 				fi
 			else
@@ -264,7 +266,7 @@ frzr_kernel() {
 				continue
 			fi
 
-			if ! cp "$modulesdir/vmlinuz" "${EFI_MOUNT_PATH}/vmlinuz-frzr"; then
+			if ! sudo cp "$modulesdir/vmlinuz" "${EFI_MOUNT_PATH}/vmlinuz-frzr"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="ERROR: Could not copy '$modulesdir/vmlinuz' to '${EFI_MOUNT_PATH}/vmlinuz-frzr'"
 				STATE="FAIL"
