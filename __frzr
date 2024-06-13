@@ -46,12 +46,13 @@ trap frzr_status SIGINT SIGTERM ERR
 
 write_tracker_file() {
 	local running_user=$(whoami)
-	if [ ! -f "$TRACKER_FILE_DIR/frzr.tracker" ]; then
-		touch "$TRACKER_FILE_DIR/frzr.tracker"
-		chown $running_user:frzr "$TRACKER_FILE_DIR/frzr.tracker"
+	if [ ! -f "${TRACKER_FILE_PATH}" ]; then
+		touch "${TRACKER_FILE_PATH}"
+		chown :frzr "${TRACKER_FILE_PATH}"
+		chmod g+w "${TRACKER_FILE_PATH}"
 	fi
 
-	frzr_status >"$TRACKER_FILE_DIR/frzr.tracker"
+	frzr_status > "${TRACKER_FILE_PATH}"
 }
 
 send_data(){

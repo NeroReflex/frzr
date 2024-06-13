@@ -32,7 +32,8 @@ ACTUAL_CHECKSUM=""   # Actual checksum of the file downloaded
 STATE=""
 
 # Tracker file directory
-TRACKER_FILE_DIR="/tmp/"
+TRACKER_FILE_DIR="/tmp"
+TRACKER_FILE_PATH="${TRACKER_FILE_DIR}/frzr.tracker"
 
 # Signals
 TASK_STATE=""

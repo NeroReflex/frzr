@@ -186,7 +186,7 @@ frzr_check() {
 }
 
 write_tracker_file() {
-    frzr_status >"$TRACKER_FILE_DIR/frzr.tracker"
+    frzr_status >"$TRACKER_FILE_PATH"
 }
 
 # Define a function to handle errors
