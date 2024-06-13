@@ -273,19 +273,30 @@ frzr_kernel() {
 			STATE="INITRAMFS"
 			;;
 		"INITRAMFS")
-			# Generate the initramfs
-			if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
-				if ! mkinitcpio -c "${BASH_SOURCE%/*}/../lib/frzr/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
+			if sudo mount -o remount,ro none /usr; then
+				if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
+					if ! mkinitcpio -c "${BASH_SOURCE%/*}/../lib/frzr/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}"; then
+						TASK_ERROR=1
+						TASK_ERROR_MSG="ERROR: Could not generate a valid initramfs"
+						STATE="FAIL"
+						send_data
+						continue
+					fi
+				else
+					TASK_ERROR=1
+					TASK_ERROR_MSG="ERROR: The new kernel has not been installed: '/usr/lib/modules/${KERNEL_NAME}' not found"
 					STATE="FAIL"
 					send_data
 					continue
 				fi
 			else
-				TASK_ERROR=1
-				TASK_ERROR_MSG="ERROR: The new kernel has not been installed: '/usr/lib/modules/${KERNEL_NAME}' not found"
-				STATE="FAIL"
-				send_data
-				continue
+				if ! mkinitcpio -c "${BASH_SOURCE%/*}/../lib/frzr/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="ERROR: Could not generate a valid initramfs"
+					STATE="FAIL"
+					send_data
+					continue
+				fi
 			fi
 
 			if ! cp "$modulesdir/vmlinuz" "${EFI_MOUNT_PATH}/vmlinuz-frzr"; then
