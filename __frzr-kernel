@@ -43,7 +43,7 @@ frzr_kernel() {
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else
 				sudo mkdir -p "${EFI_MOUNT_PATH}"
-				if sudo mount -L frzr_efi -o uid=0,gid=0,fmask=0077,dmask=0077 "${EFI_MOUNT_PATH}"; then
+				if sudo mount -L frzr_efi -o rw,noauto,noexec,nosuid,nodev,uid=0,gid=379,dmask=007,fmask=117 "${EFI_MOUNT_PATH}"; then
 					local MOUNTED_EFI_MOUNT_PATH="yes"
 				else
 					TASK_ERROR=1
@@ -356,14 +356,14 @@ frzr_kernel() {
 	# umount the efi path
 	if [ "${MOUNTED_EFI_MOUNT_PATH}" = "yes" ]; then
 		if mountpoint -q "${EFI_MOUNT_PATH}"; then
-			umount -l "${EFI_MOUNT_PATH}"
+			sudo umount -l "${EFI_MOUNT_PATH}"
 		fi
 	fi
 
 	# umount the frzr_root subvolume (if it was mounted by this tool and not externally)
 	if [ "${MOUNTED_MOUNT_PATH}" = "yes" ]; then
 		if mountpoint -q "${MOUNT_PATH}"; then
-			umount -l "${MOUNT_PATH}"
+			sudo umount -l "${MOUNT_PATH}"
 		fi
 	fi
 }
