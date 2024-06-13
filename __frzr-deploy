@@ -503,6 +503,14 @@ frzr_deploy() {
 			# Remove download artifacts (if any)
 			rm -f ${MOUNT_PATH}/*.img.*
 
+			# Lazy umount the deployed system (find all mounted subdirectories under the parent directory and unmount the mounted subdirectories)
+			TASK_MSG="Post-install umount of '${SUBVOL}'"
+			send_data
+			mounted_subdirectories=$(find "${SUBVOL}" -mindepth 1 -maxdepth 1 -type d -exec sh -c 'findmnt -M "$1" > /dev/null' sh {} \; -print)
+			echo "$mounted_subdirectories" | while read -r subdirectory; do
+				umount -l -R "$subdirectory"
+			done
+
 			# Get the subvolid: this will be used in generating the systemd-boot entry and setting is as the default for the automatic boot
 			TASK_MSG="Finding deployment subvolume ID"
 			send_data
@@ -535,13 +543,6 @@ frzr_deploy() {
 				STATE="FAIL"
 				send_data
 				continue
-			fi
-
-			# Lazy umount the deployed system
-			TASK_MSG="Post-install umount of '${SUBVOL}'"
-			send_data
-			if mount | grep -Fq "${SUBVOL}"; then
-				umount -l -R "${SUBVOL}"
 			fi
 			
 			STATE="SUCCESS"
