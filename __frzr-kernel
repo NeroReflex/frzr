@@ -55,6 +55,22 @@ frzr_kernel() {
 				sleep 5
 			fi
 
+			if [ ! -f "/usr/bin/depmod" ]; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Could not find depmod at '/usr/bin/depmod'"
+				STATE="FAIL"
+				send_data
+				continue
+			fi
+
+			if ! type -P make >/dev/null 2>&1; then
+				TASK_ERROR=1
+				TASK_ERROR_MSG="make is unavailable, did you forget to install development packages?"
+				STATE="FAIL"
+				send_data
+				continue
+			fi
+
 			if [ -d "${MOUNT_PATH}/kernels/usr" ]; then
 				MODULES_DIR="${MOUNT_PATH}/kernels"
 				KERNEL_OVERLAY_DIR="${MOUNT_PATH}/kernels"
