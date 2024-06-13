@@ -300,11 +300,12 @@ frzr_kernel() {
 			;;
 		"INITRAMFS")
 			if ! mkinitcpio -c "${BASH_SOURCE%/*}/../lib/frzr/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="ERROR: Could not generate a valid initramfs"
-				STATE="FAIL"
-				send_data
-				continue
+				#TASK_ERROR=1
+				#TASK_ERROR_MSG="ERROR: Could not generate a valid initramfs"
+				#STATE="FAIL"
+				#send_data
+				#continue
+				echo "WARNING: initramfs might not be complete"
 			fi
 
 			if ! cp "$modulesdir/vmlinuz" "${EFI_MOUNT_PATH}/vmlinuz-frzr"; then
