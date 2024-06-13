@@ -80,15 +80,12 @@ elif [ $function == "unlock" ]; then
     frzr_check_bootenv
     # We don't want to pass the function parameter to __frzr-unlock
     shift
-
-    #flock -E 255 -n /tmp/frzr.lock "frzr-unlock" "$@"
+    #flock -E 255 -n /tmp/frzr.lock "frzr-depunlockloy" "$@"
     source "${BASH_SOURCE%/*}/frzr-unlock" "$@"
-    RESULT=$?
-
+    RESULT=$TASK_ERROR
     #if [ $RESULT == 255 ]; then
     #    echo "ERROR: $(basename $0) is already running"
     #fi
-
     exit $RESULT
 elif [ $function == "bootloader" ]; then
     frzr_check_bootenv
