@@ -164,13 +164,13 @@ frzr_kernel() {
 			rm pkgbase
 
 			# Install modules suppressing depmod
-			ZSTD_CLEVEL=19 make KERNELRELEASE="${KERNEL_NAME}" INSTALL_MOD_PATH="${KERNEL_OVERLAY_DIR}/usr" INSTALL_MOD_STRIP=1 DEPMOD=/doesnt/exist modules_install
+			ZSTD_CLEVEL=19 make -j$MAKE_CORES KERNELRELEASE="${KERNEL_NAME}" INSTALL_MOD_PATH="${KERNEL_OVERLAY_DIR}/usr" INSTALL_MOD_STRIP=1 DEPMOD=/doesnt/exist modules_install
 
 			# remove build links
 			rm -rf "${modulesdir}/build"
 
 			# Install api-headers (taken from _package-api-headers)
-			make KERNELRELEASE="${KERNEL_NAME}" INSTALL_HDR_PATH="${KERNEL_OVERLAY_DIR}/usr" headers_install
+			make -j$MAKE_CORES KERNELRELEASE="${KERNEL_NAME}" INSTALL_HDR_PATH="${KERNEL_OVERLAY_DIR}/usr" headers_install
 
 			# Install kernel headers (taken from _package-headers)
 			local builddir="${KERNEL_OVERLAY_DIR}/usr/lib/modules/${KERNEL_NAME}/build"
