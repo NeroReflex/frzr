@@ -72,8 +72,8 @@ frzr_kernel() {
 			fi
 
 			if [ -d "${MOUNT_PATH}/kernels/usr" ]; then
-				MODULES_DIR="${MOUNT_PATH}/kernels"
-				KERNEL_OVERLAY_DIR="${MOUNT_PATH}/kernels"
+				local KERNEL_OVERLAY_DIR="${MOUNT_PATH}/kernels"
+				local MODULES_DIR="${KERNEL_OVERLAY_DIR}/usr"
 			else
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not find kernels overlay in '${MOUNT_PATH}/kernels/usr'"
@@ -177,7 +177,7 @@ frzr_kernel() {
 		"INSTALL")
 			
 			# Install kernel modules (taken from _package)
-			local modulesdir="${KERNEL_OVERLAY_DIR}/usr/lib/modules/${KERNEL_NAME}"
+			local modulesdir="${MODULES_DIR}/lib/modules/${KERNEL_NAME}"
 			mkdir -p -m 755 "${modulesdir}"
 
 			# systemd expects to find the kernel here to allow hibernation
@@ -190,16 +190,16 @@ frzr_kernel() {
 			rm pkgbase
 
 			# Install modules suppressing depmod
-			ZSTD_CLEVEL=19 make -j$MAKE_CORES KERNELRELEASE="${KERNEL_NAME}" INSTALL_MOD_PATH="${KERNEL_OVERLAY_DIR}/usr" INSTALL_MOD_STRIP=1 DEPMOD=/usr/bin/depmod modules_install
+			ZSTD_CLEVEL=19 make -j$MAKE_CORES KERNELRELEASE="${KERNEL_NAME}" INSTALL_MOD_PATH="${MODULES_DIR}" INSTALL_MOD_STRIP=1 DEPMOD=/usr/bin/depmod modules_install
 
 			# remove build links
 			rm -rf "${modulesdir}/build"
 
 			# Install api-headers (taken from _package-api-headers)
-			make -j$MAKE_CORES KERNELRELEASE="${KERNEL_NAME}" INSTALL_HDR_PATH="${KERNEL_OVERLAY_DIR}/usr" headers_install
+			make -j$MAKE_CORES KERNELRELEASE="${KERNEL_NAME}" INSTALL_HDR_PATH="${MODULES_DIR}" headers_install
 
 			# Install kernel headers (taken from _package-headers)
-			local builddir="${KERNEL_OVERLAY_DIR}/usr/lib/modules/${KERNEL_NAME}/build"
+			local builddir="${MODULES_DIR}/lib/modules/${KERNEL_NAME}/build"
 			mkdir -p -m 755 "${builddir}"
 
 			# Install build files
@@ -292,9 +292,9 @@ frzr_kernel() {
 			strip -v $STRIP_STATIC "$builddir/vmlinux"
 
 			# Add symlinks
-			mkdir -p -m 755 "${KERNEL_OVERLAY_DIR}/usr/src"
+			mkdir -p -m 755 "${MODULES_DIR}/src"
 
-			ln -sr "$builddir" "${KERNEL_OVERLAY_DIR}/usr/src/${KERNEL_NAME}"
+			ln -sr "$builddir" "${MODULES_DIR}/src/${KERNEL_NAME}"
 
 			STATE="INITRAMFS"
 			;;
