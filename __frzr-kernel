@@ -100,45 +100,55 @@ frzr_kernel() {
 			;;
 		
 		"BUILD")
-			if ! make defconfig; then
+
+			# Fetch the name of the kernel (uname -r)
+			if ! make -s kernelrelease > version; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not execute defconfig (1)"
 				STATE="FAIL"
 				send_data
 				continue
+			else
+				local KERNEL_NAME=$(cat version)
 			fi
 
-			# Fetch the name of the kernel (uname -r)
-			KERNEL_NAME=$(make -s kernelrelease)
+			if [ ! -f "include/config/auto.conf" ]; then
 
-			if ! make defconfig; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not execute defconfig (2)"
-				STATE="FAIL"
-				send_data
-				continue
+				if ! make defconfig; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not execute defconfig (1)"
+					STATE="FAIL"
+					send_data
+					continue
+				fi
+
+				if ! make defconfig; then
+					TASK_ERROR=1
+					TASK_ERROR_MSG="Could not execute defconfig (2)"
+					STATE="FAIL"
+					send_data
+					continue
+				fi
+
+				# This will perform a clean of previous build artifacts
+				#if ! make KERNELRELEASE="${KERNEL_NAME}" mrproper; then
+				#	TASK_ERROR=1
+				#	TASK_ERROR_MSG="Could not execute mrproper"
+				#	STATE="FAIL"
+				#	send_data
+				#	continue
+				#fi
+
+				cp .config.pre .config
+
+				#echo "Checking for pre-installed kernel"
+				#if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
+				#	TASK_ERROR=1
+				#	TASK_ERROR_MSG="ERROR: Kernel ${KERNEL_NAME} already exists"
+				#	STATE="FAIL"
+				#	continue
+				#fi
 			fi
-
-			echo "${KERNEL_NAME}" > version
-
-			# This will perform a clean of previous build artifacts
-			#if ! make KERNELRELEASE="${KERNEL_NAME}" mrproper; then
-			#	TASK_ERROR=1
-			#	TASK_ERROR_MSG="Could not execute mrproper"
-			#	STATE="FAIL"
-			#	send_data
-			#	continue
-			#fi
-
-			cp .config.pre .config
-
-			#echo "Checking for pre-installed kernel"
-			#if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
-			#	TASK_ERROR=1
-			#	TASK_ERROR_MSG="ERROR: Kernel ${KERNEL_NAME} already exists"
-			#	STATE="FAIL"
-			#	continue
-			#fi
 
 			echo "Building ${KERNEL_NAME}..."
 
@@ -168,15 +178,15 @@ frzr_kernel() {
 			
 			# Install kernel modules (taken from _package)
 			local modulesdir="${KERNEL_OVERLAY_DIR}/usr/lib/modules/${KERNEL_NAME}"
-			mkdir -p "${modulesdir}"
+			mkdir -p -m 755 "${modulesdir}"
 
 			# systemd expects to find the kernel here to allow hibernation
 			# https://github.com/systemd/systemd/commit/edda44605f06a41fb86b7ab8128dcf99161d2344
-			install -Dm644 "$(make -s KERNELRELEASE="${KERNEL_NAME}" image_name)" "$modulesdir/vmlinuz"
+			install -Dm775 "$(make -s KERNELRELEASE="${KERNEL_NAME}" image_name)" "$modulesdir/vmlinuz"
 
 			# Used by mkinitcpio to name the kernel
 			echo "$${KERNEL_NAME}" > pkgbase
-			install -Dm644 pkgbase "$modulesdir/pkgbase"
+			install -Dm775 pkgbase "$modulesdir/pkgbase"
 			rm pkgbase
 
 			# Install modules suppressing depmod
@@ -190,19 +200,19 @@ frzr_kernel() {
 
 			# Install kernel headers (taken from _package-headers)
 			local builddir="${KERNEL_OVERLAY_DIR}/usr/lib/modules/${KERNEL_NAME}/build"
-			mkdir -p "${builddir}"
+			mkdir -p -m 755 "${builddir}"
 
 			# Install build files
-			install -Dt "$builddir" -m644 .config Makefile Module.symvers System.map version vmlinux
+			install -Dt "$builddir" -m775 .config Makefile Module.symvers System.map version vmlinux
 
 			if ls -lah | grep -Fq "localversion."; then
 				for localversion in localversion.*; do
-					install -Dt "$builddir" -m644 "${localversion}"
+					install -Dt "$builddir" -m775 "${localversion}"
 				done
 			fi
 
-			install -Dt "$builddir/kernel" -m644 kernel/Makefile
-			install -Dt "$builddir/arch/x86" -m644 arch/x86/Makefile
+			install -Dt "$builddir/kernel" -m775 kernel/Makefile
+			install -Dt "$builddir/arch/x86" -m775 arch/x86/Makefile
 			cp -t "$builddir" -a scripts
 
 			# required when STACK_VALIDATION is enabled
@@ -214,25 +224,25 @@ frzr_kernel() {
 			# Install headers
 			cp -t "$builddir" -a include
 			cp -t "$builddir/arch/x86" -a arch/x86/include
-			install -Dt "$builddir/arch/x86/kernel" -m644 arch/x86/kernel/asm-offsets.s
+			install -Dt "$builddir/arch/x86/kernel" -m775 arch/x86/kernel/asm-offsets.s
 
-			install -Dt "$builddir/drivers/md" -m644 drivers/md/*.h
+			install -Dt "$builddir/drivers/md" -m775 drivers/md/*.h
 
-			install -Dt "$builddir/net/mac80211" -m644 net/mac80211/*.h
+			install -Dt "$builddir/net/mac80211" -m775 net/mac80211/*.h
 
 			# https://bugs.archlinux.org/task/13146
-			install -Dt "$builddir/drivers/media/i2c" -m644 drivers/media/i2c/msp3400-driver.h
+			install -Dt "$builddir/drivers/media/i2c" -m775 drivers/media/i2c/msp3400-driver.h
 
 			# https://bugs.archlinux.org/task/20402
-			install -Dt "$builddir/drivers/media/usb/dvb-usb" -m644 drivers/media/usb/dvb-usb/*.h
-			install -Dt "$builddir/drivers/media/dvb-frontends" -m644 drivers/media/dvb-frontends/*.h
-			install -Dt "$builddir/drivers/media/tuners" -m644 drivers/media/tuners/*.h
+			install -Dt "$builddir/drivers/media/usb/dvb-usb" -m775 drivers/media/usb/dvb-usb/*.h
+			install -Dt "$builddir/drivers/media/dvb-frontends" -m775 drivers/media/dvb-frontends/*.h
+			install -Dt "$builddir/drivers/media/tuners" -m775 drivers/media/tuners/*.h
 
 			# https://bugs.archlinux.org/task/71392
-			install -Dt "$builddir/drivers/iio/common/hid-sensors" -m644 drivers/iio/common/hid-sensors/*.h
+			install -Dt "$builddir/drivers/iio/common/hid-sensors" -m775 drivers/iio/common/hid-sensors/*.h
 
 			# Install Kconfig files
-			find . -name 'Kconfig*' -exec install -Dm644 {} "$builddir/{}" \;
+			find . -name 'Kconfig*' -exec install -Dm775 {} "$builddir/{}" \;
 
 			# Remove unneeded architectures
 			local arch
@@ -282,7 +292,7 @@ frzr_kernel() {
 			strip -v $STRIP_STATIC "$builddir/vmlinux"
 
 			# Add symlinks
-			mkdir -p "${KERNEL_OVERLAY_DIR}/usr/src"
+			mkdir -p -m 755 "${KERNEL_OVERLAY_DIR}/usr/src"
 
 			ln -sr "$builddir" "${KERNEL_OVERLAY_DIR}/usr/src/${KERNEL_NAME}"
 
