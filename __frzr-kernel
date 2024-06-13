@@ -293,7 +293,7 @@ frzr_kernel() {
 		"INITRAMFS")
 			# Generate the initramfs
 			if [ -d "/usr/lib/modules/${KERNEL_NAME}" ]; then
-				if ! sudo mkinitcpio -c "${BASH_SOURCE%/*}/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
+				if ! sudo mkinitcpio -c "${BASH_SOURCE%/*}/../lib/frzr/mkinitcpio.conf" -g "${EFI_MOUNT_PATH}/initramfs-frzr.img" -k "${KERNEL_NAME}" -r "${MODULES_DIR}"; then
 					STATE="FAIL"
 					send_data
 					continue
