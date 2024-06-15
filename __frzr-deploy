@@ -173,64 +173,73 @@ frzr_deploy() {
 				continue
 			fi
 
-			for deployment_to_be_removed in "${DEPLOY_PATH}"/*; do
-				if [ ! -z "${deployment_to_be_removed}" ] && [ -d "${deployment_to_be_removed}" ]; then
-					if is_btrfs_subvolume "${deployment_to_be_removed}"; then
-						local removal_deployment=$(basename "${deployment_to_be_removed}")
-						local removal_deployment_subvolid=$(btrfs_subvol_get_id "${deployment_to_be_removed}")
+			local default_btrfs_subvolid_cmd_res=$(btrfs subvolume get-default "${MOUNT_PATH}")
+			if [ $? -eq 0 ]; then
+				local default_btrfs_subvolid=$(echo "$default_btrfs_subvolid_cmd_res" | awk '{print $2}')
+				for deployment_to_be_removed in "${DEPLOY_PATH}"/*; do
+					if [ ! -z "${deployment_to_be_removed}" ] && [ -d "${deployment_to_be_removed}" ]; then
+						if is_btrfs_subvolume "${deployment_to_be_removed}"; then
+							local removal_deployment=$(basename "${deployment_to_be_removed}")
+							local removal_deployment_subvolid=$(btrfs_subvol_get_id "${deployment_to_be_removed}")
 
-						if echo "${removal_deployment}" | grep -Fq "${CURRENT}"; then
-							echo "Deployment will be kept: '${removal_deployment}' is the current deployment"
-						elif echo "${removal_deployment_subvolid}" | grep -Fq "ERROR"; then
-							echo "Deployment will be kept: '${removal_deployment}' cannot get the subvolid and it's too risky"
-						# TODO: elif removal_deployment_subvolid==current_default_subvol
-						else
-							TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}'"
-							send_data
-
-							# TODO: get default deployment of disk and refuse to remove the currently-default deployment
-
-							# Delete deployment boot files taking up space in /efi 
-							if [ -d "${EFI_MOUNT_PATH}/${removal_deployment}" ]; then
-								TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${removal_deployment}'"
+							if echo "${removal_deployment}" | grep -Fq "${CURRENT}"; then
+								echo "Deployment '${removal_deployment}' will be kept: is the current deployment"
+							elif echo "${removal_deployment_subvolid}" | grep -Fq "ERROR"; then
+								echo "Deployment '${removal_deployment}' will be kept: cannot get the subvolid and it's too risky to delete it"
+							elif [ "$removal_deployment_subvolid" = "$default_btrfs_subvolid" ]
+								echo "Deployment '${removal_deployment}' will be kept: Default subvolid '${default_btrfs_subvolid}' is the subvolid of the deployment"
+							else
+								TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}'"
 								send_data
-								rm -rf "${EFI_MOUNT_PATH}/${removal_deployment}"
-							fi
-							
-							# Delete deployment entries (this code is based on the fact that names of entries are generated as they are in prepare_efi_partition)
-							for entry_path in "${EFI_MOUNT_PATH}"/loader/entries/*.conf; do
-								if echo "${entry_path}" | grep -Fq "${removal_deployment}"; then
-									TASK_MSG="deleting deployment boot entry '${entry_path}'"
+
+								# TODO: get default deployment of disk and refuse to remove the currently-default deployment
+
+								# Delete deployment boot files taking up space in /efi 
+								if [ -d "${EFI_MOUNT_PATH}/${removal_deployment}" ]; then
+									TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${removal_deployment}'"
 									send_data
-									rm -f "${entry_path}"
+									rm -rf "${EFI_MOUNT_PATH}/${removal_deployment}"
 								fi
-							done
+								
+								# Delete deployment entries (this code is based on the fact that names of entries are generated as they are in prepare_efi_partition)
+								for entry_path in "${EFI_MOUNT_PATH}"/loader/entries/*.conf; do
+									if echo "${entry_path}" | grep -Fq "${removal_deployment}"; then
+										TASK_MSG="deleting deployment boot entry '${entry_path}'"
+										send_data
+										rm -f "${entry_path}"
+									fi
+								done
 
-							# Execute deployment removal scripts
-							TASK_MSG="Executing removal hooks"
-							send_data
-							local deployment_removal_hooks=$(execute_removal "${removal_deployment}" "${deployment_to_be_removed}" "${MOUNT_PATH}" "${version}")
-							if echo "${deployment_removal_hooks}" | grep -Fq "ERROR"; then
-								TASK_ERROR=1
-								TASK_ERROR_MSG="Removal hook on subvolume '${deployment_to_be_removed}' failed: ${deployment_removal_hooks}"
-								STATE="FAIL"
+								# Execute deployment removal scripts
+								TASK_MSG="Executing removal hooks"
 								send_data
-								continue
-							fi
+								local deployment_removal_hooks=$(execute_removal "${removal_deployment}" "${deployment_to_be_removed}" "${MOUNT_PATH}" "${version}")
+								if echo "${deployment_removal_hooks}" | grep -Fq "ERROR"; then
+									TASK_ERROR=1
+									TASK_ERROR_MSG="Removal hook on subvolume '${deployment_to_be_removed}' failed: ${deployment_removal_hooks}"
+									STATE="FAIL"
+									send_data
+									continue
+								fi
 
-							# Delete the deployment btrfs subvolume
-							local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${removal_deployment}")
-							if echo "${deployment_removal_result}" | grep -Fq "ERROR"; then
-								TASK_ERROR=1
-								TASK_ERROR_MSG="Could not delete the old deployment '${removal_deployment}'"
-								STATE="FAIL"
-								send_data
-								continue
+								# Delete the deployment btrfs subvolume
+								local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${removal_deployment}")
+								if echo "${deployment_removal_result}" | grep -Fq "ERROR"; then
+									TASK_ERROR=1
+									TASK_ERROR_MSG="Could not delete the old deployment '${removal_deployment}'"
+									STATE="FAIL"
+									send_data
+									continue
+								fi
 							fi
 						fi
 					fi
-				fi
-			done
+				done
+			else
+				TASK_WARNING=1
+				TASK_WARNING_MSG="Could not get the default soubvolid for the mountpoint '${MOUNT_PATH}' -- no deployments will be deleted"
+				send_data
+			fi
 
 			STATE="DOWNLOAD"
 			;;
