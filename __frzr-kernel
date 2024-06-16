@@ -100,6 +100,21 @@ frzr_kernel() {
 			;;
 		
 		"BUILD")
+			# This is important as otherwise ccache will always have 100% misses
+			export KBUILD_BUILD_TIMESTAMP=""
+			export KBUILD_BUILD_USER="root"
+			export KBUILD_BUILD_HOST="frzr"
+
+			if [ -f "/usr/bin/clang" ] && [ -f "/usr/bin/llvm-ar" ] && [ -f "/usr/bin/lld" ]; then
+				echo "Compiling with clang"
+				export LLVM=1
+				
+				if [ -f "/usr/bin/ccache" ]; then
+					export CC="ccache clang"
+				fi
+			else
+				echo "Couldn't set clang as the compiler"
+			fi
 
 			# Fetch the name of the kernel (uname -r)
 			if ! make -s kernelrelease > version; then
