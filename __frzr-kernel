@@ -200,7 +200,7 @@ frzr_kernel() {
 			install -Dm775 "$(make -s KERNELRELEASE="${KERNEL_NAME}" image_name)" "$modulesdir/vmlinuz"
 
 			# Used by mkinitcpio to name the kernel
-			echo "$${KERNEL_NAME}" > pkgbase
+			echo "${KERNEL_NAME}" > pkgbase
 			install -Dm775 pkgbase "$modulesdir/pkgbase"
 			rm pkgbase
 

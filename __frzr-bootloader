@@ -141,18 +141,17 @@ frzr_bootloader() {
 		"CONFIGURE")
             # Get the rootfs UUID: this will be used in generating the systemd-boot entry
 			TASK_MSG="Finding deployment partition UUID"
-			local rootfs_uuid=$(get_uuid "$SUBVOL")
+			local rootfs_uuid=$(get_uuid "${SUBVOL}")
 			if echo "$rootfs_uuid" | grep -Fq "ERROR"; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="Could not find rootfs UUID of the new deployment"
-				STATE="FAIL"
+				local rootfs_uuid=""
+				TASK_WARNING=1
+				TASK_WARNING_MSG="Could not find rootfs UUID of the new deployment -- gpt-auto will be used"
 				send_data
-				continue
 			fi
 
 			# Get the subvolid: this will be used in generating the systemd-boot entry and setting is as the default for the automatic boot
 			TASK_MSG="Finding deployment subvolume ID"
-			local rootfs_subvolid=$(btrfs_subvol_get_id "$SUBVOL")
+			local rootfs_subvolid=$(btrfs_subvol_get_id "${SUBVOL}")
 			if echo "$subvolid" | grep -Fq "ERROR"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not find subvolume ID of the new deployment"
@@ -167,10 +166,10 @@ frzr_bootloader() {
 			fi
 
 			# Read additional boot arguments (to be added to the kernel cmdline) from the deployed image
-			local additional_arguments=""
+			local deployment_arguments=""
 			if [ -f "${SUBVOL}/usr/lib/frzr.d/bootconfig.conf" ]; then
 				local bootconf_args=$(cat "${SUBVOL}/usr/lib/frzr.d/bootconfig.conf") 
-				additional_arguments="$additional_arguments ${bootconf_args}"
+				deployment_arguments="$deployment_arguments ${bootconf_args}"
 			else
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Could not read '${SUBVOL}/usr/lib/frzr.d/bootconfig.conf': default kernel cmdline will be used"
@@ -178,7 +177,7 @@ frzr_bootloader() {
 			fi
 
 			# Read additional boot arguments (to be added to the kernel cmdline) from the user file
-			local additional_arguments=""
+			local additional_arguments="$deployment_arguments"
 			if [ -f "${EFI_MOUNT_PATH}/frzr_bootconfig.conf" ]; then
 				local user_bootconf_args=$(cat "${EFI_MOUNT_PATH}/frzr_bootconfig.conf") 
 				additional_arguments="$additional_arguments ${user_bootconf_args}"
