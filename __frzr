@@ -765,7 +765,19 @@ prepare_efi_partition() {
 	# this will hold the default .conf file
 	local default_boot_cfg=""
 
+	# Clear out old initramfs for the current deployment
+	if [ -d "${efi_mount_path}/${version}" ]; then
+		rm -rf "${efi_mount_path}/${version}"
+	fi
+
 	if [ -d "${efi_mount_path}/loader/entries" ]; then
+		# Clear out old boot configuration
+		for config_file_path in "${efi_mount_path}/loader/entries"/frzr-*; do
+			if echo "${config_file_path}" | grep -Fq "${version}"; then
+				rm -f "${config_file_path}"
+			fi
+		done
+
 		# Iterate over each pair of files
 		for vmlinuz_file_path in "${boot_dir}"/vmlinuz-*; do
 			# Extract the matching part of the filename and remove the .img extension
@@ -785,7 +797,7 @@ prepare_efi_partition() {
 			# Check if the corresponding vmlinuz file exists
 			if [ -f "${boot_dir}/${vmlinuz_file}" ] && [ -f "${boot_dir}/${initramfs_file}" ]; then
 				# each deployment will need its own kernel(s) as well as initramfs to boot: place them in a EFI subdirectory
-				mkdir -p ${efi_mount_path}/${version}
+				mkdir -p "${efi_mount_path}/${version}"
 
 				# If the initramfs contains the AMD microcode spare space in /efi and do not copy it
 				if cat "${boot_dir}/${initramfs_file}" | cpio -itv 2>/dev/null | grep -Fq "AuthenticAMD.bin"; then
