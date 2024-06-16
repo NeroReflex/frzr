@@ -480,18 +480,6 @@ frzr_deploy() {
 				fi
 			fi
 
-			# Verify the system installation status, check for device quirks, and prepare for cleanup
-			# Check if the FIRMWARE_OVERRIDE variable is set by the install media, if so enable firmware overrides
-			#if [ -n "${FIRMWARE_OVERRIDE}" ]; then
-			#	echo "export USE_FIRMWARE_OVERRIDES=1" >${MOUNT_PATH}/etc/device-quirks.conf
-			#fi
-
-			# Run frzr-tweaks to execute the device-quirks to be supplied by the deployed images
-			#frzr-tweaks # TODO: pass the root as an argument and in the script default to "/"
-
-			# Run frzr-initramfs to create mkinicpio.conf and build an initramfs
-			#frzr-initramfs # TODO: review, this writes mkinitcpio.conf, make sure it stays aligned with the image one
-
 			STATE="CLEANUP"
 			;;
 		"CLEANUP")

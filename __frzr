@@ -635,8 +635,9 @@ execute_removal() {
 }
 
 # Write the systemd-boot entry needed to boot the specified deployment
-# Note: this function can ignore amd-ucode and intel-ucode if those are not found since mkinitcpio will place those
-# in the initramfs and including them on systemd-boot is not deprecated.
+# Note: this function can ignore amd-ucode and intel-ucode if those are not found since 
+#         either dracut or mkinitcpio will place those in the initramfs and including
+#         them on systemd-boot is now being deprecated.
 # $1  the deployment version
 # $2  the config file name
 # $3  the boot entry (visible) name

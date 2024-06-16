@@ -300,6 +300,9 @@ frzr_kernel() {
 			;;
 		"INITRAMFS")
 
+			# This has worked:
+			# dracut --force --add-drivers " xhci_pci usbhid "  --filesystems "overlay btrfs" --strip --aggressive-strip  --reproducible --kver ${KERNEL_NAME} --kmoddir "${MODULES_DIR}/lib/modules/${KERNEL_NAME}" "${EFI_MOUNT_PATH}/initramfs-frzr.img"
+
 			if ! dracut --force --filesystems "overlay btrfs" --strip --aggressive-strip --fstab --reproducible --kver ${KERNEL_NAME} --kmoddir "${MODULES_DIR}/lib/modules/${KERNEL_NAME}" "${EFI_MOUNT_PATH}/initramfs-frzr.img"; then
 				#TASK_ERROR=1
 				#TASK_ERROR_MSG="ERROR: Could not generate a valid initramfs"
