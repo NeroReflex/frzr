@@ -183,11 +183,14 @@ frzr_deploy() {
 							local removal_deployment_subvolid=$(btrfs_subvol_get_id "${deployment_to_be_removed}")
 
 							if echo "${removal_deployment}" | grep -Fq "${CURRENT}"; then
-								echo "Deployment '${removal_deployment}' will be kept: is the current deployment"
+								TASK_MSG="Deployment '${removal_deployment}' will be kept: is the current deployment"
+								send_data
 							elif echo "${removal_deployment_subvolid}" | grep -Fq "ERROR"; then
-								echo "Deployment '${removal_deployment}' will be kept: cannot get the subvolid and it's too risky to delete it"
+								TASK_MSG="Deployment '${removal_deployment}' will be kept: cannot get the subvolid and it's too risky to delete it"
+								send_data
 							elif [ "$removal_deployment_subvolid" = "$default_btrfs_subvolid" ]; then
-								echo "Deployment '${removal_deployment}' will be kept: Default subvolid '${default_btrfs_subvolid}' is the subvolid of the deployment"
+								TASK_MSG="Deployment '${removal_deployment}' will be kept: Default subvolid '${default_btrfs_subvolid}' is the subvolid of the deployment"
+								send_data
 							else
 								TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}'"
 								send_data
@@ -356,7 +359,7 @@ frzr_deploy() {
 						whiptail --gauge "Downloading system image (${NAME})" 10 50 0
 				fi
 			fi
-			echo "Entering Chucksum Case"
+
 			STATE="CHECKSUM"
 			;;
 		"CHECKSUM")
@@ -396,7 +399,8 @@ frzr_deploy() {
 
 			# Use BTRFS receive to install the image
 			if [ -z ${SHOW_UI} ]; then
-				echo "Installing image ${NAME}"
+				TASK_MSG="Installing image ${NAME}"
+				send_data
 			else
 				# TODO: verify if this really works
 				whiptail --infobox "Extracting and installing system image (${NAME}). This may take some time." 10 50
