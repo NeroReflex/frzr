@@ -186,7 +186,7 @@ frzr_deploy() {
 								echo "Deployment '${removal_deployment}' will be kept: is the current deployment"
 							elif echo "${removal_deployment_subvolid}" | grep -Fq "ERROR"; then
 								echo "Deployment '${removal_deployment}' will be kept: cannot get the subvolid and it's too risky to delete it"
-							elif [ "$removal_deployment_subvolid" = "$default_btrfs_subvolid" ]
+							elif [ "$removal_deployment_subvolid" = "$default_btrfs_subvolid" ]; then
 								echo "Deployment '${removal_deployment}' will be kept: Default subvolid '${default_btrfs_subvolid}' is the subvolid of the deployment"
 							else
 								TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}'"
