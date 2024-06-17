@@ -195,8 +195,6 @@ frzr_deploy() {
 								TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}'"
 								send_data
 
-								# TODO: get default deployment of disk and refuse to remove the currently-default deployment
-
 								# Delete deployment boot files taking up space in /efi 
 								if [ -d "${EFI_MOUNT_PATH}/${removal_deployment}" ]; then
 									TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${removal_deployment}'"
