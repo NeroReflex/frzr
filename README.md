@@ -28,3 +28,21 @@ To ease system management and system debuggability frzr can be used to keep a pr
 manage deployments in a completely separate way so that your beloved archlinux install will remain usable whenever you want to.
 
 Also frzr ships with utilities that are meant to regenerate bootloader entries whenever a kernel gets installed or uninstalled.
+
+## Q&A
+
+__Q__ Are there limitations on what systems can be deployed?
+__A__ Yes, supported systems must support from a btrfs subvolume and must be able to mount a shared /home subvolume or partition.
+
+__Q__ Is the distro limited in what it can do once installed?
+__A__ Not by default, every limitation is decided by maintainers of that distro.
+
+__Q__ Is it easy to create a proof-of-concept distro that is compatible with frzr?
+__A__ Absolutely: frzr wants to be hackable and easy to work with in every aspect: just create a btrfs subvolume and run your preferred command to write a rootfs (debootstrap, pacstrap or whatever). Then create a snapshot of it with btrfs send and that file can be deployed on real hardware!
+
+__Q__ Can a distro be shipped with its own kernel?
+__A__ Yes and this is the preferred method. The user can boot a deployment only if such deployment comes with its own kernel or the user has installed one
+already via the dedicated *frzr kernel* tool!
+
+__Q__ Are there rules to follow?
+__A__ There are conventions: for example a distro should __NOT__ assume it's the only distro installed, and *SHOULD NOT* cause harm to other deployments for example by writing to the efi partition.
