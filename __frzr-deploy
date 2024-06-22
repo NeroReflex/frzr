@@ -106,7 +106,7 @@ frzr_deploy() {
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
-			if mount | grep -Fq "${MOUNT_PATH}"; then
+			if mount | grep -Fq "on ${MOUNT_PATH}"; then
 				local MOUNTED_MOUNT_PATH="no"
 			else
 				MOUNT_PATH="/tmp/frzr_root"
@@ -147,7 +147,7 @@ frzr_deploy() {
 			TASK_MSG="Preparing '${EFI_MOUNT_PATH}' to be used as the EFI System path"
 			send_data
 
-			if mount | grep -Fq "${EFI_MOUNT_PATH}"; then
+			if mount | grep -Fq "on ${EFI_MOUNT_PATH}"; then
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else
 				mkdir -p "${EFI_MOUNT_PATH}"
@@ -496,7 +496,7 @@ frzr_deploy() {
 			send_data
 
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-			local efi_update_result=$(frzr-bootloader "${NAME}")
+			local efi_update_result=$("${BASH_SOURCE%/*}/frzr-bootloader" "${NAME}")
 			if echo "${efi_update_result}" | grep -Fq 'ERROR'; then
 				# bootloader configuration could not be updated
 				TASK_ERROR=1
