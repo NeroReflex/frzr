@@ -30,7 +30,7 @@ DISK="$MOUNTED_DEVICE" SWAP_GIB=0 bash /workdir/frzr bootstrap
 # Display what's mounted
 mount
 
-SKIP_UEFI_CHECK="yes" MOUNT_PATH="/tmp/frzr_root" FRZR_SKIP_CHECK="yes" bash /workdir/frzr deploy chimeraos/chimeraos:45_1
+SKIP_UEFI_CHECK="yes" MOUNT_PATH="/tmp/frzr_root" FRZR_SKIP_CHECK="yes" SYSTEMD_RELAX_ESP_CHECKS=1 bash /workdir/frzr deploy chimeraos/chimeraos:45_1
 
 # Umount the loopback device
 losetup -d "$MOUNTED_DEVICE"
