@@ -27,3 +27,9 @@ MOUNTED_DEVICE=$(losetup -a | grep "$FILENAME" | cut -d ' ' -f 1 | sed 's/://')
 
 DISK="$MOUNTED_DEVICE" SWAP_GIB=0 bash /workdir/frzr bootstrap
 SKIP_UEFI_CHECK="yes" MOUNT_PATH="/tmp/frzr_root" bash /workdir/frzr deploy chimeraos/chimeraos:unstable
+
+# Umount the loopback device
+losetup -d "$MOUNTED_DEVICE"
+
+# Remove the file
+rm -f $BUILD_IMG
