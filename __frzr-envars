@@ -24,7 +24,7 @@ if [ -z "$MOUNT_PATH" ]; then
     MOUNT_PATH="/frzr_root"    # This is set as /tmp/frzr_root/ in the installer and /frzr_root during upgrades
 fi
 
-if [ -z "$EFI_MOUNT_PATH"]; then
+if [ -z "$EFI_MOUNT_PATH" ]; then
     EFI_MOUNT_PATH="${MOUNT_PATH}/efi" # EFI mount path
 fi
 
