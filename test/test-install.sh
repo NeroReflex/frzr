@@ -9,7 +9,7 @@ pacman -S --noconfirm archlinux-keyring
 pacman-key --init
 pacman-key --populate archlinux
 
-pacman -S --noconfirm parted
+pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux zstd xz
 
 FILENAME=image.img
 BUILD_DIR="/workdir/output"
