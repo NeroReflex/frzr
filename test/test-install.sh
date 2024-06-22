@@ -24,4 +24,4 @@ losetup -fP "$BUILD_IMG"
 # Find the loop device associated with the image file
 MOUNTED_DEVICE=$(losetup -a | grep "$FILENAME" | cut -d ' ' -f 1 | sed 's/://')
 
-DISK="$MOUNTED_DEVICE" bash /workdir/frzr bootstrap
+DISK="$MOUNTED_DEVICE" SWAP_GIB=0 bash /workdir/frzr bootstrap
