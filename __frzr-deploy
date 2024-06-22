@@ -97,11 +97,15 @@ frzr_deploy() {
 				continue
 			fi
 			
+            # Try to use a specified MOUNT_PATH by default
+            if [ -z "${MOUNT_PATH}" ]; then
+			    MOUNT_PATH="/frzr_root"
+            fi
+
 			# Make sure the frzr_root is mounted during the deployment procedure
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
-			MOUNT_PATH="/frzr_root"
 			if mount | grep -Fq "${MOUNT_PATH}"; then
 				local MOUNTED_MOUNT_PATH="no"
 			else
