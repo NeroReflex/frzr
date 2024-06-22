@@ -40,7 +40,9 @@ export FRZR_SKIP_CHECK="yes"
 export SYSTEMD_RELAX_ESP_CHECKS=1
 bash /workdir/frzr deploy chimeraos/chimeraos:45_1
 
-for deployment_path in "${MOUNT_PATH}"/deployments/*; do
+ls -lah "${MOUNT_PATH}/deployments/"
+
+for deployment_path in $MOUNT_PATH/deployments/chimera*; do
     mount --bind "$deployment_path" /mnt
     arch-chroot /mnt /bin/bash <<EOF
 # old releases used an older frzr
