@@ -8,8 +8,9 @@ pacman -Sy --noconfirm
 pacman -S --noconfirm archlinux-keyring
 pacman-key --init
 pacman-key --populate archlinux
+pacman -Syu --noconfirm
 
-pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux zstd xz
+pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux zstd xz curl wget
 
 FILENAME=image.img
 BUILD_DIR="/workdir/output"
