@@ -13,11 +13,6 @@ frzr_kernel() {
 	while $RUNNING; do
 		case "$STATE" in
 		"BEGIN")
-			# Try to use a specified MOUNT_PATH by default
-            if [ -z "${MOUNT_PATH}" ]; then
-			    MOUNT_PATH="/frzr_root"
-            fi
-
 			# Make sure the frzr_root is mounted during the deployment procedure
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
@@ -40,8 +35,6 @@ frzr_kernel() {
 			fi
 
 			# Make sure the EFI partition is mounted during the deployment procedure
-			EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
-
 			if mount | grep -Fq "on ${EFI_MOUNT_PATH}"; then
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else

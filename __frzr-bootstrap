@@ -284,13 +284,20 @@ frzr_bootstrap() {
             if (lsblk -o label ${DISK} | grep -q frzr_efi); then
                 echo "Existing installation found"
 
-                if (whiptail --yesno --yes-button "Repair" --no-button "Clean" "WARNING: $DISK appears to already have a system installed. Would you like to repair it or do a clean install?\n\nNOTE: A clean install will delete everything on the disk, but a repair install will preserve your user data." 13 70); then
-                    echo "User chose to do a repair install"
+                if [ "$REPAIR_INSTALL" = "1"]; then
                     REPAIR_INSTALL=1
                     STATE="REPAIR"
-                else
-                    echo "User chose to do a clean install"
+                elif [ "$REPAIR_INSTALL" = "0"]; then
                     STATE="FORMAT"
+                else
+                    if (whiptail --yesno --yes-button "Repair" --no-button "Clean" "WARNING: $DISK appears to already have a system installed. Would you like to repair it or do a clean install?\n\nNOTE: A clean install will delete everything on the disk, but a repair install will preserve your user data." 13 70); then
+                        echo "User chose to do a repair install"
+                        REPAIR_INSTALL=1
+                        STATE="REPAIR"
+                    else
+                        echo "User chose to do a clean install"
+                        STATE="FORMAT"
+                    fi
                 fi
             else
                 echo "Existing installation not found"

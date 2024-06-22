@@ -99,7 +99,6 @@ frzr_deploy() {
 			
             # Try to use a specified MOUNT_PATH by default
             if [ -z "${MOUNT_PATH}" ]; then
-			    MOUNT_PATH="/frzr_root"
                 echo "MOUNT_PATH WAS NOT SPECIFIED"
             else
                 echo "MOUNT_PATH='$MOUNT_PATH'"
@@ -147,11 +146,8 @@ frzr_deploy() {
 			fi
 
 			# Make sure the EFI partition is mounted during the deployment procedure
-			EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
-
 			TASK_MSG="Preparing '${EFI_MOUNT_PATH}' to be used as the EFI System path"
 			send_data
-
 			if mount | grep -Fq "on ${EFI_MOUNT_PATH}"; then
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else
