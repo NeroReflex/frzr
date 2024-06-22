@@ -13,3 +13,7 @@ jobs:
       run: |
         cd test
         ./run.sh
+    - name: Test Install
+      run: |
+        docker run -u root --rm --entrypoint=/workdir/test/test-install.sh -v $(pwd):/workdir archlinux:latest
+        

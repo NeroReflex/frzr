@@ -264,16 +264,20 @@ frzr_bootstrap() {
 
             echo "Checking for drives connected to the system"
             MOUNT_PATH=/tmp/frzr_root
-            device_list=()
-            device_output=$(lsblk --list -n -o name,model,size,type | grep disk | tr -s ' ' '\t')
-            while read -r line; do
-                name=/dev/$(echo "$line" | cut -f 1)
-                model=$(echo "$line" | cut -f 2)
-                size=$(echo "$line" | cut -f 3)
-                device_list+=($name)
-                device_list+=("$model ($size)")
-            done <<<"$device_output"
-            DISK=$(whiptail --nocancel --menu "Choose a disk to install to:" 20 50 5 "${device_list[@]}" 3>&1 1>&2 2>&3)
+            if [ -z "${DISK}" ]; then
+				device_list=()
+				device_output=$(lsblk --list -n -o name,model,size,type | grep disk | tr -s ' ' '\t')
+				while read -r line; do
+					name=/dev/$(echo "$line" | cut -f 1)
+					model=$(echo "$line" | cut -f 2)
+					size=$(echo "$line" | cut -f 3)
+					device_list+=($name)
+					device_list+=("$model ($size)")
+				done <<<"$device_output"
+				DISK=$(whiptail --nocancel --menu "Choose a disk to install to:" 20 50 5 "${device_list[@]}" 3>&1 1>&2 2>&3)
+			else
+				echo "specified disk is '$DISK'"
+			fi
             echo "Checking for existing FRZR deployments"
             # Checking for existing installation
 
