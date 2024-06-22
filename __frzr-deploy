@@ -88,7 +88,7 @@ frzr_deploy() {
 			TASK_STATE="BEGIN"
 			send_data
 			
-			local version=$(frzr-version)
+			local version=$("${BASH_SOURCE%/*}frzr-version")
 			if echo "${version}" | grep -Fq "ERROR"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not fetch frzr version: ${version}"

@@ -59,7 +59,7 @@ frzr_unlock() {
             STATE="BEGIN"
             ;;
         "BEGIN")
-            FRZR_VERSION=$(frzr-version)
+            FRZR_VERSION=$("${BASH_SOURCE%/*}frzr-version")
             if echo "${FRZR_VERSION}" | grep -Fq "ERROR"; then
                 TASK_ERROR=1
                 TASK_ERROR_MSG="Could not fetch frzr version: ${FRZR_VERSION}"
