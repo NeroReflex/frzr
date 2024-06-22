@@ -10,7 +10,7 @@ pacman-key --init
 pacman-key --populate archlinux
 pacman -Syu --noconfirm
 
-pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux zstd xz curl wget
+pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux zstd xz curl wget arch-install-scripts
 
 # Create the frzr group
 groupadd -g 379 frzr
@@ -42,6 +42,21 @@ export EFI_MOUNT_PATH="/tmp/frzr_root/efi"
 export FRZR_SKIP_CHECK="yes"
 export SYSTEMD_RELAX_ESP_CHECKS=1
 bash /workdir/frzr deploy chimeraos/chimeraos:45_1
+
+for deployment_path in "${MOUNT_PATH}"/deployments/*; do
+    mount --bind "$deployment_path" /mnt
+    arch-chroot /mnt /bin/bash <<EOF
+# old releases used an older frzr
+INSTALLED_RELEASE=$(frzr-release)
+
+# Print out the result
+echo "Installed release is $INSTALLED_RELEASE"
+
+echo "$INSTALLED_RELEASE" | grep -Fq "chimeraos_45"
+EOF
+
+    umount -r /mnt
+done
 
 # Umount the loopback device
 losetup -d "$MOUNTED_DEVICE"
