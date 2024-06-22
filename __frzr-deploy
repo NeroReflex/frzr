@@ -104,7 +104,6 @@ frzr_deploy() {
 			if mount | grep -Fq "on ${MOUNT_PATH}"; then
 				local MOUNTED_MOUNT_PATH="no"
 			else
-                echo "ERRORRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR!!!!!!!!!!"
 				MOUNT_PATH="/tmp/frzr_root"
 				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				send_data
@@ -143,7 +142,6 @@ frzr_deploy() {
 			if mount | grep -Fq "on ${EFI_MOUNT_PATH}"; then
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else
-                echo "ERRORRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR!!!!!!!!&&"
 				mkdir -p "${EFI_MOUNT_PATH}"
 				if mount -L frzr_efi -o uid=0,gid=0,fmask=0077,dmask=0077 "${EFI_MOUNT_PATH}"; then
 					local MOUNTED_EFI_MOUNT_PATH="yes"
@@ -438,16 +436,16 @@ frzr_deploy() {
 			fi
 
 			# bind-mount /efi of the newly deployed image
-			#if [ -d "${SUBVOL}/efi" ]; then
-			#	local SUBVOL_EFI_MOUNT="${SUBVOL}/efi"
-			#	if [ -d "${SUBVOL_EFI_MOUNT}" ]; then
-			#		mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL_EFI_MOUNT}"
-			#	else
-			#		TASK_WARNING=1
-			#		TASK_WARNING_MSG="Could not mount ESP partition because image does not have a /efi directory"
-			#		send_data
-			#	fi
-			#fi
+			if [ -d "${SUBVOL}/efi" ]; then
+				local SUBVOL_EFI_MOUNT="${SUBVOL}/efi"
+				if [ -d "${SUBVOL_EFI_MOUNT}" ]; then
+					mount --bind "${EFI_MOUNT_PATH}" "${SUBVOL_EFI_MOUNT}"
+				else
+					TASK_WARNING=1
+					TASK_WARNING_MSG="Could not mount ESP partition because image does not have a /efi directory"
+					send_data
+				fi
+			fi
 
 			# Execute any migrations available in the image to be deployed
 			if [ -d "${SUBVOL}"/usr/lib/frzr.d ]; then
