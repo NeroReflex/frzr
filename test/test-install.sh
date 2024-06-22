@@ -17,7 +17,7 @@ BUILD_DIR="/workdir/output"
 BUILD_IMG="$BUILD_DIR/$FILENAME"
 
 mkdir -p "$BUILD_DIR"
-dd if=/dev/zero of=$BUILD_IMG bs=1M count=4096
+dd if=/dev/zero of=$BUILD_IMG bs=1M count=8192
 
 # Associate the image file with a loop device
 losetup -fP "$BUILD_IMG"
