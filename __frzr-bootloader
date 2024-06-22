@@ -44,6 +44,7 @@ frzr_bootloader() {
 			if mount | grep -Fq "on ${MOUNT_PATH}"; then
 				local MOUNTED_MOUNT_PATH="no"
 			else
+                echo "ERRORRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR!!!!!!!!"
 				MOUNT_PATH="/tmp/frzr_root"
 				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				send_data
@@ -67,6 +68,7 @@ frzr_bootloader() {
 			if mount | grep -Fq "on ${EFI_MOUNT_PATH}"; then
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else
+                echo "ERRORRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR!!!!!!!!"
 				mkdir -p "${EFI_MOUNT_PATH}"
 				if mount -L frzr_efi -o uid=0,gid=0,fmask=0077,dmask=0077 "${EFI_MOUNT_PATH}"; then
 					local MOUNTED_EFI_MOUNT_PATH="yes"
