@@ -3,6 +3,14 @@
 set -e
 set -x
 
+# Prepare the image
+pacman -Sy --noconfirm
+pacman -S --noconfirm archlinux-keyring
+pacman-key --init
+pacman-key --populate archlinux
+
+pacman -S --noconfirm parted
+
 FILENAME=image.img
 BUILD_DIR="/workdir/output"
 BUILD_IMG="$BUILD_DIR/$FILENAME"
