@@ -42,8 +42,7 @@ export SYSTEMD_RELAX_ESP_CHECKS=1
 # deploy chimeraos-45-1_9a95912
 bash /workdir/frzr deploy chimeraos/chimeraos:45_1
 
-ls -lah "${MOUNT_PATH}"
-ls -lah "${MOUNT_PATH}/deployments"
+ls -lah "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912"
 
 export CHROOT_PATH="/mnt"
 
