@@ -100,6 +100,9 @@ frzr_deploy() {
             # Try to use a specified MOUNT_PATH by default
             if [ -z "${MOUNT_PATH}" ]; then
 			    MOUNT_PATH="/frzr_root"
+                echo "MOUNT_PATH WAS NOT SPECIFIED"
+            else
+                echo "MOUNT_PATH='$MOUNT_PATH'"
             fi
 
 			# Make sure the frzr_root is mounted during the deployment procedure
