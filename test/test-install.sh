@@ -12,6 +12,10 @@ pacman -Syu --noconfirm
 
 pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux zstd xz curl wget
 
+# Create the frzr group
+groupadd -g 379 frzr
+usermod -a -G frzr $(whoami)
+
 FILENAME=image.img
 BUILD_DIR="/workdir/output"
 BUILD_IMG="$BUILD_DIR/$FILENAME"
