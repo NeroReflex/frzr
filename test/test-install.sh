@@ -38,14 +38,19 @@ export MOUNT_PATH="/tmp/frzr_root"
 export EFI_MOUNT_PATH="/tmp/frzr_root/efi"
 export FRZR_SKIP_CHECK="yes"
 export SYSTEMD_RELAX_ESP_CHECKS=1
+
+# deploy chimeraos-45-1_9a95912
 bash /workdir/frzr deploy chimeraos/chimeraos:45_1
 
 ls -lah "${MOUNT_PATH}"
 ls -lah "${MOUNT_PATH}/deployments"
 
-for deployment_path in $MOUNT_PATH/deployments/chimera*; do
-    mount --bind "$deployment_path" /mnt
-    arch-chroot /mnt /bin/bash <<EOF
+mount --bind "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912" /mnt
+mount -t proc /proc "${CHROOT_PATH}/proc"
+mount -t sysfs /sys "${CHROOT_PATH}/sys"
+mount --rbind /dev "${CHROOT_PATH}/dev"
+
+chroot /mnt /bin/bash <<EOF
 # old releases used an older frzr
 INSTALLED_RELEASE=$(cat /build_info | head -n 1)
 
@@ -55,8 +60,7 @@ echo "Installed release is $INSTALLED_RELEASE"
 echo "$INSTALLED_RELEASE" | grep -Fq "chimeraos_45"
 EOF
 
-    umount -r /mnt
-done
+umount -r /mnt
 
 # Umount the loopback device
 losetup -d "$MOUNTED_DEVICE"
