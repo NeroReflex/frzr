@@ -38,16 +38,19 @@ frzr_deploy() {
 				continue
 			fi
 
-			TASK_MSG="Checking if the system has booted via UEFI"
-			send_data
-			check_uefi_result=$(check_uefi)
-			if echo "${check_uefi_result}" | grep -Fq 'ERROR'; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="UEFI boot check failed: ${check_uefi_result}"
-				STATE="FAIL"
-				send_data
-				continue
-			fi
+            # Since this code is tested in GitHub CI it is important to to disable the UEFI test in that scenario
+            if [ -z "${SKIP_UEFI_CHECK}" ]; then
+                TASK_MSG="Checking if the system has booted via UEFI"
+                send_data
+                check_uefi_result=$(check_uefi)
+                if echo "${check_uefi_result}" | grep -Fq 'ERROR'; then
+                    TASK_ERROR=1
+                    TASK_ERROR_MSG="UEFI boot check failed: ${check_uefi_result}"
+                    STATE="FAIL"
+                    send_data
+                    continue
+                fi
+            fi
 			
 			# Check if any updates are available and preserve FRZR parameters
 			while (("$#")); do
