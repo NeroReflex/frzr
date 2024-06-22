@@ -78,8 +78,8 @@ frzr_deploy() {
 
 			# keep only the first param as source
 			FRZR_SOURCE="${FRZR_PARAMS%% *}"
-			if frzr-release > /dev/null; then
-				CURRENT=`frzr-release`
+			if "${BASH_SOURCE%/*}/frzr-release" > /dev/null; then
+				CURRENT=$("${BASH_SOURCE%/*}/frzr-release")
 			fi
 
 			STATE="BEGIN"
