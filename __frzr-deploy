@@ -104,8 +104,7 @@ frzr_deploy() {
 			if mount | grep -Fq "on ${MOUNT_PATH}"; then
 				local MOUNTED_MOUNT_PATH="no"
 			else
-                mount
-                echo "${MOUNT_PATH} ERRORRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR!!!!!!!!!!"
+                echo "ERRORRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR!!!!!!!!!!"
 				MOUNT_PATH="/tmp/frzr_root"
 				TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"
 				send_data
