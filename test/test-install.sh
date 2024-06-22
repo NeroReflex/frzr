@@ -4,7 +4,7 @@ set -e
 set -x
 
 FILENAME=image.img
-BUILD_IMG="/output/$FILENAME"
+BUILD_IMG="/workdir/output/$FILENAME"
 
 dd if=/dev/zero of=$BUILD_IMG bs=1M count=4096
 
