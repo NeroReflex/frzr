@@ -33,9 +33,6 @@ export DISK="$MOUNTED_DEVICE"
 export SWAP_GIB=0
 bash /workdir/frzr bootstrap
 
-# Display what's mounted
-mount
-
 export SKIP_UEFI_CHECK="yes"
 export MOUNT_PATH="/tmp/frzr_root"
 export EFI_MOUNT_PATH="/tmp/frzr_root/efi"
@@ -47,7 +44,7 @@ for deployment_path in "${MOUNT_PATH}"/deployments/*; do
     mount --bind "$deployment_path" /mnt
     arch-chroot /mnt /bin/bash <<EOF
 # old releases used an older frzr
-INSTALLED_RELEASE=$(frzr-release)
+INSTALLED_RELEASE=$(cat /build_info | head -n 1)
 
 # Print out the result
 echo "Installed release is $INSTALLED_RELEASE"
