@@ -126,7 +126,7 @@ frzr_bootloader() {
 		"BOOTLOADER")
 
 			# Check if a (supported) bootloader is present and if not install it
-
+            mount
 			# Install systemd-boot as the bootloader
 			if [ ! -f "${EFI_MOUNT_PATH}/EFI/systemd/systemd-bootx64.efi" ]; then
 				TASK_MSG="Installing systemd-boot to '${EFI_MOUNT_PATH}' as the bootloader"
