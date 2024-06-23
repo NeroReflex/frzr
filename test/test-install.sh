@@ -52,6 +52,9 @@ mount -t sysfs /sys "${CHROOT_PATH}/sys"
 mount --rbind /dev "${CHROOT_PATH}/dev"
 
 chroot "$CHROOT_PATH" /bin/bash <<EOF
+pwd
+ls -lah .
+
 # old releases used an older frzr
 INSTALLED_RELEASE=$(cat /build_info | head -n 1)
 
