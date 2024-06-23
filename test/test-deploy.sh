@@ -46,6 +46,10 @@ yes | pacstrap $MOUNT_POINT/archlinux base base-devel linux linux-firmware mkini
 
 echo "archlinux-frzr" > $MOUNT_POINT/archlinux/build_info
 
+# Make the subvolume read-only (btrfs send cannot work on rw/ subvolumes)
+btrfs property set -fts $MOUNT_POINT/archlinux ro true
+
+# Create the deployment file
 btrfs send $MOUNT_POINT/archlinux | xz -e -9 --memory=95% -T0 > $TARGET_FILENAME
 
 # Unmount the img file
