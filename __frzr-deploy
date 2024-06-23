@@ -181,7 +181,7 @@ frzr_deploy() {
 							local removal_deployment=$(basename "${deployment_to_be_removed}")
 							local removal_deployment_subvolid=$(btrfs_subvol_get_id "${deployment_to_be_removed}")
 
-							if echo "${removal_deployment}" | grep -Fq "${CURRENT}"; then
+							if echo "${removal_deployment}" | grep -Fq "${CURRENT}" && ! echo "${CURRENT}" | grep -Fq "ERROR"; then
 								TASK_MSG="Deployment '${removal_deployment}' will be kept: is the current deployment"
 								send_data
                                 echo "$TASK_MSG"
