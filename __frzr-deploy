@@ -170,7 +170,6 @@ frzr_deploy() {
 				TASK_WARNING=1
 				TASK_WARNING_MSG="Could not retrieve deployment to keep: ${CURRENT}"
 				send_data
-                continue
 			fi
 
             echo "ENTERING DELETION"
