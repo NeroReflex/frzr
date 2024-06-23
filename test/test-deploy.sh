@@ -39,7 +39,7 @@ mount -o loop $IMG_FILE $MOUNT_POINT
 btrfs subvol create $MOUNT_POINT/archlinux
 
 # Bootstrap Arch Linux into the img file
-pacstrap --noconfirm -N $MOUNT_POINT/archlinux base base-devel linux linux-firmware mkinitcpio
+yes | pacstrap -N $MOUNT_POINT/archlinux base base-devel linux linux-firmware mkinitcpio
 
 # Generate fstab
 #genfstab -U $MOUNT_POINT >> $MOUNT_POINT/archlinux/etc/fstab
