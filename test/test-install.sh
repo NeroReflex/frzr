@@ -45,13 +45,12 @@ bash /workdir/frzr deploy chimeraos/chimeraos:45_1
 # old releases used an older frzr
 INSTALLED_RELEASE=$(cat "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912/build_info" | head -n 1)
 
-# Print out the result
-echo "Installed release is $INSTALLED_RELEASE"
-
-#echo "$INSTALLED_RELEASE" | grep -Fq "chimeraos_45"
-
 # Umount the loopback device
 losetup -d "$MOUNTED_DEVICE"
 
 # Remove the file
 rm -f $BUILD_IMG
+
+if ! "$INSTALLED_RELEASE" | grep -Fq "chimeraos_45"
+    exit 1
+fi
