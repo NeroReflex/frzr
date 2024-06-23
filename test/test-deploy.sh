@@ -22,7 +22,7 @@ export IMG_FILE="archlinux.img"
 export IMG_SIZE="2G"
 export MOUNT_POINT="/mnt/arch"
 export ARCH_MIRRORLIST="Server = http://mirror.rackspace.com/archlinux/\$repo/os/\$arch"
-export TARGET_FILENAME="archlinux.img.xz"
+export TARGET_FILENAME="/workdir/output/archlinux.img.xz"
 
 # Create an empty img file
 truncate -s $IMG_SIZE $IMG_FILE
@@ -31,22 +31,22 @@ truncate -s $IMG_SIZE $IMG_FILE
 mkfs.btrfs $IMG_FILE
 
 # Mount the img file
-sudo mount -o loop $IMG_FILE $MOUNT_POINT
+mount -o loop $IMG_FILE $MOUNT_POINT
 
-subo btrfs subvol create $MOUNT_POINT/archlinux
+btrfs subvol create $MOUNT_POINT/archlinux
 
 # Bootstrap Arch Linux into the img file
-sudo pacstrap --noconfirm -N $MOUNT_POINT/archlinux base base-devel linux linux-firmware mkinitcpio
+pacstrap --noconfirm -N $MOUNT_POINT/archlinux base base-devel linux linux-firmware mkinitcpio
 
 # Generate fstab
-#sudo genfstab -U $MOUNT_POINT >> $MOUNT_POINT/archlinux/etc/fstab
+#genfstab -U $MOUNT_POINT >> $MOUNT_POINT/archlinux/etc/fstab
 
 echo "archlinux-frzr" > $MOUNT_POINT/archlinux/build_info
 
 btrfs send $MOUNT_POINT/archlinux | xz -e -9 --memory=95% -T0 > $TARGET_FILENAME
 
 # Unmount the img file
-sudo umount $MOUNT_POINT
+umount $MOUNT_POINT
 
 rm -rf $IMG_FILE
 
@@ -86,6 +86,7 @@ losetup -d "$MOUNTED_DEVICE"
 
 # Remove the file
 rm -f $BUILD_IMG
+rm -f $TARGET_FILENAME
 
 if [ "$INSTALLED_RELEASE" = "archlinux-frzr" ]; then
     echo "VERIFIED"
