@@ -21,7 +21,7 @@ export BUILD_DIR="/workdir/output"
 export BUILD_IMG="$BUILD_DIR/$FILENAME"
 
 mkdir -p "$BUILD_DIR"
-dd if=/dev/zero of=$BUILD_IMG bs=1M count=12288
+dd if=/dev/zero of=$BUILD_IMG bs=1M count=16384
 
 # Associate the image file with a loop device
 losetup -fP "$BUILD_IMG"
@@ -39,7 +39,7 @@ export EFI_MOUNT_PATH="/tmp/frzr_root/efi"
 export FRZR_SKIP_CHECK="yes"
 export SYSTEMD_RELAX_ESP_CHECKS=1
 
-# deploy chimeraos-44
+# deploy chimeraos-43_6978095
 bash /workdir/frzr deploy chimeraos/chimeraos:43
 
 ls -lah "$MOUNT_PATH/deployments"
