@@ -253,7 +253,7 @@ frzr_deploy() {
 			;;
 		"DOWNLOAD")
 			TASK_STATE="DOWNLOAD"
-            echo "ENTERING DOWNLOAD"
+
 			# Check if source needs updated or needs to be created for the first time
 			if [ ! -z "$FRZR_SOURCE" ] && [ "$FRZR_SOURCE" != " " ] && [ $FRZR_CHECK_UPDATE -eq 0 ] && [ $FRZR_STEAM_PROGRESS -eq 0 ]; then
 				echo "$FRZR_SOURCE" >"${MOUNT_PATH}/source"
@@ -264,9 +264,7 @@ frzr_deploy() {
 			else
 				echo "WARNING: source wasn't specified"
 			fi
-			
-            TASK_MSG="Determining what source image we should use"
-            send_data
+			TASK_MSG="Determining what source image we should use"
 			if [ "${local_install}" == true ]; then
 				mkdir tmp_source
 				mount -o rw -L FRZR_UPDATE /root/tmp_source
@@ -290,7 +288,6 @@ frzr_deploy() {
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
 				IMG_FILE="${FRZR_SOURCE}"
 			else
-                echo "WRONG CASE ENTERED"
 				TASK_MSG="We will be downloading the image from the specified repo"
 				REPO=$(echo "${SOURCE}" | cut -f 1 -d ':')
 				CHANNEL=$(echo "${SOURCE}" | cut -f 2 -d ':')
@@ -410,8 +407,6 @@ frzr_deploy() {
 				fi
 			fi
 
-
-            echo "DOING FINE"
 			# Use BTRFS receive to install the image
 			if [ -z ${SHOW_UI} ]; then
 				TASK_MSG="Installing image ${NAME}"
