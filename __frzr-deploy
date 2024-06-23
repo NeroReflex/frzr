@@ -183,19 +183,16 @@ frzr_deploy() {
 							if echo "${removal_deployment}" | grep -Fq "${CURRENT}" && ! echo "${CURRENT}" | grep -Fq "ERROR"; then
 								TASK_MSG="Deployment '${removal_deployment}' will be kept: is the current deployment"
 								send_data
-                                echo "$TASK_MSG"
 							elif echo "${removal_deployment_subvolid}" | grep -Fq "ERROR"; then
 								TASK_MSG="Deployment '${removal_deployment}' will be kept: cannot get the subvolid and it's too risky to delete it"
 								send_data
-                                echo "$TASK_MSG"
 							elif [ "$removal_deployment_subvolid" = "$default_btrfs_subvolid" ]; then
 								TASK_MSG="Deployment '${removal_deployment}' will be kept: Default subvolid '${default_btrfs_subvolid}' is the subvolid of the deployment"
 								send_data
-                                echo "$TASK_MSG"
 							else
 								TASK_MSG="Deleting deployment ${removal_deployment}: it is not the current '${CURRENT}'"
 								send_data
-                                echo "$TASK_MSG"
+
 								# Delete deployment boot files taking up space in /efi 
 								if [ -d "${EFI_MOUNT_PATH}/${removal_deployment}" ]; then
 									TASK_MSG="deleting deployment boot files from '${EFI_MOUNT_PATH}/${removal_deployment}'"
@@ -236,11 +233,7 @@ frzr_deploy() {
 									continue
 								fi
 							fi
-                        else
-                            echo "Not a subvolume?!?!?"
 						fi
-                    else
-                        echo "E tu cosa ci fa qui?!?!?"
 					fi
 				done
 			else
