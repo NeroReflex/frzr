@@ -42,29 +42,13 @@ export SYSTEMD_RELAX_ESP_CHECKS=1
 # deploy chimeraos-45-1_9a95912
 bash /workdir/frzr deploy chimeraos/chimeraos:45_1
 
-ls -lah "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912"
-
-export CHROOT_PATH="/mnt"
-
-#mount --bind "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912" "$CHROOT_PATH"
-#mount -t proc /proc "${CHROOT_PATH}/proc"
-#mount -t sysfs /sys "${CHROOT_PATH}/sys"
-#mount --rbind /dev "${CHROOT_PATH}/dev"
-
-arch-chroot "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912" /bin/bash <<EOF
-pwd
-ls -lah .
-
 # old releases used an older frzr
-INSTALLED_RELEASE=$(cat /build_info | head -n 1)
+INSTALLED_RELEASE=$(cat "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912/build_info" | head -n 1)
 
 # Print out the result
 echo "Installed release is $INSTALLED_RELEASE"
 
-echo "$INSTALLED_RELEASE" | grep -Fq "chimeraos_45"
-EOF
-
-#umount -r "$CHROOT_PATH"
+#echo "$INSTALLED_RELEASE" | grep -Fq "chimeraos_45"
 
 # Umount the loopback device
 losetup -d "$MOUNTED_DEVICE"
