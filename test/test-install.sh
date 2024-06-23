@@ -51,6 +51,6 @@ losetup -d "$MOUNTED_DEVICE"
 # Remove the file
 rm -f $BUILD_IMG
 
-if ! "$INSTALLED_RELEASE" | grep -Fq "chimeraos_45"
+if ! "$INSTALLED_RELEASE" | grep -Fq "chimeraos_45"; then
     exit 1
 fi
