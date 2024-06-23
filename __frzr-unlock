@@ -52,15 +52,14 @@ frzr_unlock() {
             done
 
             # keep only the first param as source
-            FRZR_SOURCE="${FRZR_PARAMS%% *}"
-            if frzr-release > /dev/null; then
-                CURRENT=`frzr-release`
-            fi
+            if "${BASH_SOURCE%/*}/frzr-release" > /dev/null; then
+				CURRENT=$("${BASH_SOURCE%/*}/frzr-release")
+			fi
             
             STATE="BEGIN"
             ;;
         "BEGIN")
-            FRZR_VERSION=$(frzr-version)
+            FRZR_VERSION=$("${BASH_SOURCE%/*}/frzr-version")
             if echo "${FRZR_VERSION}" | grep -Fq "ERROR"; then
                 TASK_ERROR=1
                 TASK_ERROR_MSG="Could not fetch frzr version: ${FRZR_VERSION}"
@@ -73,7 +72,6 @@ frzr_unlock() {
             # this code is based on the fact that when a btrfs filesystem is created
             # the default subvolid that is created contextually has the ID set to 256
             # also as a matter of fact in btrfs is impossible to change subvolumes IDs
-            MOUNT_PATH="/frzr_root"
             if ! mountpoint -q "${MOUNT_PATH}" && ls -1 /dev/disk/by-label | grep frzr_root > /dev/null; then
                 MOUNT_PATH="/tmp/frzr_root"
                 #TASK_MSG="Preparing '${MOUNT_PATH}' to be used as the main subvolume mount path"

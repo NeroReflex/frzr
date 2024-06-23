@@ -38,16 +38,19 @@ frzr_deploy() {
 				continue
 			fi
 
-			TASK_MSG="Checking if the system has booted via UEFI"
-			send_data
-			check_uefi_result=$(check_uefi)
-			if echo "${check_uefi_result}" | grep -Fq 'ERROR'; then
-				TASK_ERROR=1
-				TASK_ERROR_MSG="UEFI boot check failed: ${check_uefi_result}"
-				STATE="FAIL"
-				send_data
-				continue
-			fi
+            # Since this code is tested in GitHub CI it is important to to disable the UEFI test in that scenario
+            if [ -z "${SKIP_UEFI_CHECK}" ]; then
+                TASK_MSG="Checking if the system has booted via UEFI"
+                send_data
+                check_uefi_result=$(check_uefi)
+                if echo "${check_uefi_result}" | grep -Fq 'ERROR'; then
+                    TASK_ERROR=1
+                    TASK_ERROR_MSG="UEFI boot check failed: ${check_uefi_result}"
+                    STATE="FAIL"
+                    send_data
+                    continue
+                fi
+            fi
 			
 			# Check if any updates are available and preserve FRZR parameters
 			while (("$#")); do
@@ -75,8 +78,8 @@ frzr_deploy() {
 
 			# keep only the first param as source
 			FRZR_SOURCE="${FRZR_PARAMS%% *}"
-			if frzr-release > /dev/null; then
-				CURRENT=`frzr-release`
+			if "${BASH_SOURCE%/*}/frzr-release" > /dev/null; then
+				CURRENT=$("${BASH_SOURCE%/*}/frzr-release")
 			fi
 
 			STATE="BEGIN"
@@ -85,7 +88,7 @@ frzr_deploy() {
 			TASK_STATE="BEGIN"
 			send_data
 			
-			local version=$(frzr-version)
+			local version=$("${BASH_SOURCE%/*}/frzr-version")
 			if echo "${version}" | grep -Fq "ERROR"; then
 				TASK_ERROR=1
 				TASK_ERROR_MSG="Could not fetch frzr version: ${version}"
@@ -98,8 +101,7 @@ frzr_deploy() {
 			# this code is based on the fact that when a btrfs filesystem is created
 			# the default subvolid that is created contextually has the ID set to 256
 			# also as a matter of fact in btrfs is impossible to change subvolumes IDs
-			MOUNT_PATH="/frzr_root"
-			if mount | grep -Fq "${MOUNT_PATH}"; then
+			if mount | grep -Fq "on ${MOUNT_PATH}"; then
 				local MOUNTED_MOUNT_PATH="no"
 			else
 				MOUNT_PATH="/tmp/frzr_root"
@@ -135,12 +137,9 @@ frzr_deploy() {
 			fi
 
 			# Make sure the EFI partition is mounted during the deployment procedure
-			EFI_MOUNT_PATH="${MOUNT_PATH}/efi"
-
 			TASK_MSG="Preparing '${EFI_MOUNT_PATH}' to be used as the EFI System path"
 			send_data
-
-			if mount | grep -Fq "${EFI_MOUNT_PATH}"; then
+			if mount | grep -Fq "on ${EFI_MOUNT_PATH}"; then
 				local MOUNTED_EFI_MOUNT_PATH="no"
 			else
 				mkdir -p "${EFI_MOUNT_PATH}"
@@ -489,7 +488,7 @@ frzr_deploy() {
 			send_data
 
 			# This is used to update the EFI partition: setting up systemd-boot (or whatever else bootlader might be supported) to boot the new deployment
-			local efi_update_result=$(frzr-bootloader "${NAME}")
+			local efi_update_result=$("${BASH_SOURCE%/*}/frzr-bootloader" "${NAME}")
 			if echo "${efi_update_result}" | grep -Fq 'ERROR'; then
 				# bootloader configuration could not be updated
 				TASK_ERROR=1

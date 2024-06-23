@@ -9,7 +9,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Fix files permission
+      run: |
+        chmod +x frzr* __frzr*
     - name: Run tests
       run: |
         cd test
         ./run.sh
+    - name: Test Install
+      run: |
+        chmod +x test/*.sh
+        docker run -u root --rm --entrypoint=/workdir/test/test-install.sh -v $(pwd):/workdir -v /dev:/dev --privileged archlinux:latest
+
