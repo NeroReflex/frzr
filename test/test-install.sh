@@ -46,12 +46,12 @@ ls -lah "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912"
 
 export CHROOT_PATH="/mnt"
 
-mount --bind "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912" "$CHROOT_PATH"
-mount -t proc /proc "${CHROOT_PATH}/proc"
-mount -t sysfs /sys "${CHROOT_PATH}/sys"
-mount --rbind /dev "${CHROOT_PATH}/dev"
+#mount --bind "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912" "$CHROOT_PATH"
+#mount -t proc /proc "${CHROOT_PATH}/proc"
+#mount -t sysfs /sys "${CHROOT_PATH}/sys"
+#mount --rbind /dev "${CHROOT_PATH}/dev"
 
-chroot "$CHROOT_PATH" /bin/bash <<EOF
+arch-chroot "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912" /bin/bash <<EOF
 pwd
 ls -lah .
 
@@ -64,7 +64,7 @@ echo "Installed release is $INSTALLED_RELEASE"
 echo "$INSTALLED_RELEASE" | grep -Fq "chimeraos_45"
 EOF
 
-umount -r "$CHROOT_PATH"
+#umount -r "$CHROOT_PATH"
 
 # Umount the loopback device
 losetup -d "$MOUNTED_DEVICE"
