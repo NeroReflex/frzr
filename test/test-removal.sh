@@ -21,7 +21,7 @@ export BUILD_DIR="/workdir/output"
 export BUILD_IMG="$BUILD_DIR/$FILENAME"
 
 mkdir -p "$BUILD_DIR"
-dd if=/dev/zero of=$BUILD_IMG bs=1M count=12288
+dd if=/dev/zero of=$BUILD_IMG bs=1M count=16384
 
 # Associate the image file with a loop device
 losetup -fP "$BUILD_IMG"
