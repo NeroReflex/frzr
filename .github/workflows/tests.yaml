@@ -18,6 +18,8 @@ jobs:
         ./run.sh
     - name: Test Install
       run: |
-        chmod +x test/*.sh
         docker run -u root --rm --entrypoint=/workdir/test/test-install.sh -v $(pwd):/workdir -v /dev:/dev --privileged archlinux:latest
+    - name: Test Removal
+      run: |
+        docker run -u root --rm --entrypoint=/workdir/test/test-removal.sh -v $(pwd):/workdir -v /dev:/dev --privileged archlinux:latest
 

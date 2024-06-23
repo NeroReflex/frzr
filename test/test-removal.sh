@@ -16,7 +16,7 @@ pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux z
 groupadd -g 379 frzr
 usermod -a -G frzr $(whoami)
 
-export FILENAME=install_image.img
+export FILENAME=removal_image.img
 export BUILD_DIR="/workdir/output"
 export BUILD_IMG="$BUILD_DIR/$FILENAME"
 
@@ -39,11 +39,34 @@ export EFI_MOUNT_PATH="/tmp/frzr_root/efi"
 export FRZR_SKIP_CHECK="yes"
 export SYSTEMD_RELAX_ESP_CHECKS=1
 
+# deploy chimeraos-44
+bash /workdir/frzr deploy chimeraos/chimeraos:43
+
+ls -lah "$MOUNT_PATH/deployments"
+
+# deploy chimeraos-44
+bash /workdir/frzr deploy chimeraos/chimeraos:44
+
+#if ! cat "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912/build_info" | head -n 1 | grep -Fq "chimeraos-45"; then
+#    exit 1
+#fi
+
+ls -lah "$MOUNT_PATH/deployments"
+
+# deploy chimeraos-45
+bash /workdir/frzr deploy chimeraos/chimeraos:45
+
+ls -lah "$MOUNT_PATH/deployments"
+
 # deploy chimeraos-45-1_9a95912
 bash /workdir/frzr deploy chimeraos/chimeraos:45_1
 
-# old releases used an older frzr
-INSTALLED_RELEASE=$(cat "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912/build_info" | head -n 1)
+if ! cat "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912/build_info" | head -n 1 | grep -Fq "chimeraos-45"; then
+    exit 1
+fi
+
+
+
 
 # Umount the loopback device
 losetup -d "$MOUNTED_DEVICE"
@@ -51,6 +74,3 @@ losetup -d "$MOUNTED_DEVICE"
 # Remove the file
 rm -f $BUILD_IMG
 
-if ! echo "$INSTALLED_RELEASE" | grep -Fq "chimeraos-45"; then
-    exit 1
-fi
