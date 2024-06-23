@@ -49,7 +49,7 @@ INSTALLED_RELEASE=$(cat "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912/build_in
 losetup -d "$MOUNTED_DEVICE"
 
 # Remove the file
-rm -f $BUILD_IMG
+#rm -f $BUILD_IMG
 
 if ! echo "$INSTALLED_RELEASE" | grep -Fq "chimeraos-45"; then
     exit 1
