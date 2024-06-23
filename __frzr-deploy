@@ -284,43 +284,16 @@ frzr_deploy() {
 				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
 				IMG_FILE="${FRZR_SOURCE}"
-
-                # Skip downloading and sha verification if the deployment is a file
-                if [ -f "$FRZR_SOURCE" ]; then
-                    echo ".img.tar.xz file: FILE_NAME=$FILE_NAME, SUBVOL=$SUBVOL, IMG_FILE=$IMG_FILE"
-                    STATE="EXTRACT"
-                    continue
-                else
-                    echo "$FRZR_SOURCE is not a .img.tar.xz file"
-                fi
             elif [[ "$FRZR_SOURCE" == *".img.xz" ]]; then
 				FILE_NAME=$(basename ${FRZR_SOURCE})
 				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
 				IMG_FILE="${FRZR_SOURCE}"
-
-                # Skip downloading and sha verification if the deployment is a file
-                if [ -f "$FRZR_SOURCE" ]; then
-                    echo ".img.xz file: FILE_NAME=$FILE_NAME, SUBVOL=$SUBVOL, IMG_FILE=$IMG_FILE"
-                    STATE="EXTRACT"
-                    continue
-                else
-                    echo "$FRZR_SOURCE is not a .img.xz file"
-                fi
 			elif [[ "$FRZR_SOURCE" == *".img" ]]; then
 				FILE_NAME=$(basename ${FRZR_SOURCE})
 				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
 				IMG_FILE="${FRZR_SOURCE}"
-
-                # Skip downloading and sha verification if the deployment is a file
-                if [ -f "$FRZR_SOURCE" ]; then
-                    echo ".img file: FILE_NAME=$FILE_NAME, SUBVOL=$SUBVOL, IMG_FILE=$IMG_FILE"
-                    STATE="EXTRACT"
-                    continue
-                else
-                    echo "$FRZR_SOURCE is not a .img file"
-                fi
 			else
                 echo "WRONG CASE ENTERED"
 				TASK_MSG="We will be downloading the image from the specified repo"
