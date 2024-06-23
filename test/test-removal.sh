@@ -42,9 +42,11 @@ export SYSTEMD_RELAX_ESP_CHECKS=1
 # deploy chimeraos-43_6978095
 bash /workdir/frzr deploy chimeraos/chimeraos:43
 
-ls -lah "$MOUNT_PATH/deployments"
+if [ ! -d "$MOUNT_PATH/deployments/chimeraos-43_6978095" ]; then
+    exit 1
+fi
 
-# deploy chimeraos-44
+# deploy chimeraos-44_c3670dd
 bash /workdir/frzr deploy chimeraos/chimeraos:44
 
 #if ! cat "$MOUNT_PATH/deployments/chimeraos-45-1_9a95912/build_info" | head -n 1 | grep -Fq "chimeraos-45"; then

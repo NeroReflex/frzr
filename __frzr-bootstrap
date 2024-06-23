@@ -168,7 +168,7 @@ fresh_install() {
 	local root_part=$(fdisk -o Device --list ${disk} | grep "^${disk}.*${ROOT_PART_NUMBER}$")
 	mkfs.btrfs -L frzr_root -f ${root_part}
 	local root_uuid=$(blkid -s UUID -o value "${root_part}")
-	mount -t btrfs -o compress=zstd:15 "${root_part}" "${frzr_root}" # mount rootfs
+	mount -t btrfs -o compress-force=zstd:15 "${root_part}" "${frzr_root}" # mount rootfs
 	mkdir -p "${frzr_root}/efi" # prepare to mount vfat
 	#echo "${root_uuid}" > "${frzr_root}/root_uuid"
 	btrfs subvolume create ${frzr_root}/var
