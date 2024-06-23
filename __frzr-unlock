@@ -120,17 +120,24 @@ frzr_unlock() {
             STATE="UNLOCK"
             ;;
         "UNLOCK")
-            # set rootfs btrfs subvolume to read-write mode
-            UNLOCK_RESULT=$(execute_unlock "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" "${FRZR_VERSION}")
-            if echo "${UNLOCK_RESULT}" | grep -Fq 'ERROR'; then
-                echo "frzr deployment ${NAME} unlock failed: ${UNLOCK_RESULT}"
+            if [ -d "${SUBVOL}/usr/lib/frzr.d" ]; then
+                # set rootfs btrfs subvolume to read-write mode
+                UNLOCK_RESULT=$(execute_unlock "${NAME}" "${SUBVOL}" "${MOUNT_PATH}" "${FRZR_VERSION}")
+                if echo "${UNLOCK_RESULT}" | grep -Fq 'ERROR'; then
+                    echo "frzr deployment ${NAME} unlock failed: ${UNLOCK_RESULT}"
+                    STATE="FAIL"
+                    continue
+                fi
+
+                systemctl daemon-reload
+
+                STATE="SUCCESS"
+            else
+                TASK_ERROR=1
+                TASK_ERROR_MSG="Could not find unlock migrations for deployment '${NAME}', '${SUBVOL}/usr/lib/frzr.d' does not exists"
                 STATE="FAIL"
                 continue
             fi
-
-            systemctl daemon-reload
-
-            STATE="SUCCESS"
             ;;
         "SUCCESS")
             # This state should only be used if the unlock completed without errors

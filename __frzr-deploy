@@ -214,16 +214,18 @@ frzr_deploy() {
 								done
 
 								# Execute deployment removal scripts
-								TASK_MSG="Executing removal hooks"
-								send_data
-								local deployment_removal_hooks=$(execute_removal "${removal_deployment}" "${deployment_to_be_removed}" "${MOUNT_PATH}" "${version}")
-								if echo "${deployment_removal_hooks}" | grep -Fq "ERROR"; then
-									TASK_ERROR=1
-									TASK_ERROR_MSG="Removal hook on subvolume '${deployment_to_be_removed}' failed: ${deployment_removal_hooks}"
-									STATE="FAIL"
-									send_data
-									continue
-								fi
+                                if [ -d "${deployment_to_be_removed}/usr/lib/frzr.d" ]; then
+                                    TASK_MSG="Executing removal hooks"
+                                    send_data
+                                    local deployment_removal_hooks=$(execute_removal "${removal_deployment}" "${deployment_to_be_removed}" "${MOUNT_PATH}" "${version}")
+                                    if echo "${deployment_removal_hooks}" | grep -Fq "ERROR"; then
+                                        TASK_ERROR=1
+                                        TASK_ERROR_MSG="Removal hook on subvolume '${deployment_to_be_removed}' failed: ${deployment_removal_hooks}"
+                                        STATE="FAIL"
+                                        send_data
+                                        continue
+                                    fi
+                                fi
 
 								# Delete the deployment btrfs subvolume
 								local deployment_removal_result=$(btrfs_subvolume_simple_delete "${DEPLOY_PATH}/${removal_deployment}")
