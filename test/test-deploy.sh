@@ -30,6 +30,9 @@ truncate -s $IMG_SIZE $IMG_FILE
 # Format the img file as btrfs
 mkfs.btrfs $IMG_FILE
 
+# Create the mount directory
+mkdir -p $MOUNT_POINT
+
 # Mount the img file
 mount -o loop $IMG_FILE $MOUNT_POINT
 
