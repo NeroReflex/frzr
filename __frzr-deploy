@@ -253,7 +253,7 @@ frzr_deploy() {
 			;;
 		"DOWNLOAD")
 			TASK_STATE="DOWNLOAD"
-            echo "ENTERING DOWNLOAD WITH SOURCE '$FRZR_SOURCE'"
+            echo "ENTERING DOWNLOAD"
 			# Check if source needs updated or needs to be created for the first time
 			if [ ! -z "$FRZR_SOURCE" ] && [ "$FRZR_SOURCE" != " " ] && [ $FRZR_CHECK_UPDATE -eq 0 ] && [ $FRZR_STEAM_PROGRESS -eq 0 ]; then
 				echo "$FRZR_SOURCE" >"${MOUNT_PATH}/source"
