@@ -87,7 +87,7 @@ frzr_deploy() {
 		"BEGIN")
 			TASK_STATE="BEGIN"
 			send_data
-			echo "BEGIN CASE"
+			
 			local version=$("${BASH_SOURCE%/*}/frzr-version")
 			if echo "${version}" | grep -Fq "ERROR"; then
 				TASK_ERROR=1
@@ -135,7 +135,7 @@ frzr_deploy() {
 				send_data
 				continue
 			fi
-            echo "MOUNTING EFI"
+
 			# Make sure the EFI partition is mounted during the deployment procedure
 			TASK_MSG="Preparing '${EFI_MOUNT_PATH}' to be used as the EFI System path"
 			send_data
@@ -159,7 +159,6 @@ frzr_deploy() {
 			STATE="PREPARE"
 			;;
 		"PREPARE")
-            echo "PREPARE CASE"
 			TASK_STATE="PREPARE"
 			send_data
 			# Before the new image is deployed
@@ -171,8 +170,6 @@ frzr_deploy() {
 				TASK_WARNING_MSG="Could not retrieve deployment to keep: ${CURRENT}"
 				send_data
 			fi
-
-            echo "ENTERING DELETION"
 
 			local default_btrfs_subvolid_cmd_res=$(btrfs subvolume get-default "${MOUNT_PATH}")
 			if [ $? -eq 0 ]; then
@@ -251,8 +248,6 @@ frzr_deploy() {
 				TASK_WARNING_MSG="Could not get the default soubvolid for the mountpoint '${MOUNT_PATH}' -- no deployments will be deleted"
 				send_data
 			fi
-
-            echo "EXITING DELETION"
 
 			STATE="DOWNLOAD"
 			;;
@@ -381,32 +376,20 @@ frzr_deploy() {
 			STATE="CHECKSUM"
 			;;
 		"CHECKSUM")
-
-            # If the image is a local one try to fetch its sha256sum
-            if [ -z "$EXPECTED_CHECKSUM" ] && [ -f "${IMG_FILE}.sha256" ]; then
-                EXPECTED_CHECKSUM=$(cat "${IMG_FILE}.sha256")
-            fi
-
 			TASK_STATE="CHECKSUM"
 			TASK_MSG="Verifying if checksums match"
 			send_data
 			ACTUAL_CHECKSUM=$(sha256sum "${IMG_FILE}" | cut -d' ' -f 1)
-            if [ ! -z "$EXPECTED_CHECKSUM" ]; then
-                if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
-                    rm -f "${IMG_FILE}"
+			if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
+				rm -f "${IMG_FILE}"
 
-                    # We can attempt to redownload the image again here instead of aborting like the original behavior
-                    TASK_ERROR=1
-                    TASK_ERROR_MSG="Checksum does not match"
-                    STATE="FAIL"
-                    send_data
-                    continue
-                fi
-            else
-                TASK_WARNING=1
-				TASK_WARNING_MSG="Could not fetch the deployment checksum"
+				# We can attempt to redownload the image again here instead of aborting like the original behavior
+				TASK_ERROR=1
+				TASK_ERROR_MSG="Checksum does not match"
+				STATE="FAIL"
 				send_data
-            fi
+				continue
+			fi
 			TASK_TRACKER=1 # Tell any listeners this task was completed, I'm not sure this variable will be needed in the end
 			send_data
 
