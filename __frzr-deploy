@@ -278,11 +278,34 @@ frzr_deploy() {
 				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
 				IMG_FILE="${FRZR_SOURCE}"
+
+                # Skip downloading and sha verification if the deployment is a file
+                if [ -f "$FRZR_SOURCE" ]; then
+                    STATE="EXTRACT"
+                    continue
+                fi
+            elif [[ "$FRZR_SOURCE" == *".img.xz" ]]; then
+				FILE_NAME=$(basename ${FRZR_SOURCE})
+				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
+				SUBVOL="${DEPLOY_PATH}/${NAME}"
+				IMG_FILE="${FRZR_SOURCE}"
+
+                # Skip downloading and sha verification if the deployment is a file
+                if [ -f "$FRZR_SOURCE" ]; then
+                    STATE="EXTRACT"
+                    continue
+                fi
 			elif [[ "$FRZR_SOURCE" == *".img" ]]; then
 				FILE_NAME=$(basename ${FRZR_SOURCE})
 				NAME=$(echo "${FILE_NAME}" | cut -f 1 -d '.')
 				SUBVOL="${DEPLOY_PATH}/${NAME}"
 				IMG_FILE="${FRZR_SOURCE}"
+
+                # Skip downloading and sha verification if the deployment is a file
+                if [ -f "$FRZR_SOURCE" ]; then
+                    STATE="EXTRACT"
+                    continue
+                fi
 			else
 				TASK_MSG="We will be downloading the image from the specified repo"
 				REPO=$(echo "${SOURCE}" | cut -f 1 -d ':')
