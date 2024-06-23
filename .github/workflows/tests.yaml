@@ -19,11 +19,9 @@ jobs:
     - name: Test Install
       run: |
         docker run --name test_install -u root --rm --entrypoint=/workdir/test/test-install.sh -v $(pwd):/workdir -v /dev:/dev --privileged archlinux:latest
-        docker rm test_install
         rm -f /workdir/output/*.img
     - name: Test Removal
       run: |
         docker run --name test_removal -u root --rm --entrypoint=/workdir/test/test-removal.sh -v $(pwd):/workdir -v /dev:/dev --privileged archlinux:latest
-        docker rm test_removal
         rm -f /workdir/output/*.img
 
