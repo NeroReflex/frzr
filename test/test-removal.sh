@@ -75,5 +75,5 @@ fi
 losetup -d "$MOUNTED_DEVICE"
 
 # Remove the file
-#rm -f $BUILD_IMG
+rm -f $BUILD_IMG
 
