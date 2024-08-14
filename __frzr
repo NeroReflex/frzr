@@ -46,14 +46,8 @@ EOF
 trap frzr_status SIGINT SIGTERM ERR
 
 write_tracker_file() {
-	local running_user=$(whoami)
-	if [ ! -f "${TRACKER_FILE_PATH}" ]; then
-		touch "${TRACKER_FILE_PATH}"
-		chown $UID:379 "${TRACKER_FILE_PATH}"
-		chmod g+w "${TRACKER_FILE_PATH}"
-	fi
-
 	frzr_status > "${TRACKER_FILE_PATH}"
+	chmod 777 "${TRACKER_FILE_PATH}"
 }
 
 send_data(){
