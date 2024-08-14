@@ -17,7 +17,7 @@ groupadd -g 379 frzr
 usermod -a -G frzr $(whoami)
 useradd -m -s /usr/bin/bash -g frzr tester
 
-cd /workdir && make install
+cd /workdir && VERSION="1.0.0" make install
 
 # run frzr version from current user
 frzr version

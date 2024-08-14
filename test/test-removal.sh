@@ -16,6 +16,8 @@ pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux z
 groupadd -g 379 frzr
 usermod -a -G frzr $(whoami)
 
+cd /workdir && VERSION="1.0.0" make install
+
 export FILENAME=removal_image.img
 export BUILD_DIR="/workdir/output"
 export BUILD_IMG="$BUILD_DIR/$FILENAME"
@@ -28,8 +30,6 @@ losetup -fP "$BUILD_IMG"
 
 # Find the loop device associated with the image file
 MOUNTED_DEVICE=$(losetup -a | grep "$FILENAME" | cut -d ' ' -f 1 | sed 's/://')
-
-cd /workdir && make install
 
 export DISK="$MOUNTED_DEVICE"
 export SWAP_GIB=0

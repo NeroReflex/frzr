@@ -16,7 +16,7 @@ pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux z
 groupadd -g 379 frzr
 usermod -a -G frzr $(whoami)
 
-cd /workdir && make install
+cd /workdir && VERSION="1.0.0" make install
 
 # Define variables
 export IMG_FILE="archlinux.img"
