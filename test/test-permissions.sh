@@ -18,7 +18,7 @@ usermod -a -G frzr $(whoami)
 useradd tester
 usermod -a -G frzr tester
 
-cd /workdir/frzr && make install
+cd /workdir && make install
 
 # run frzr version from current user
 frzr version

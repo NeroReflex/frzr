@@ -16,7 +16,7 @@ pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux z
 groupadd -g 379 frzr
 usermod -a -G frzr $(whoami)
 
-cd /workdir/frzr && make install
+cd /workdir && make install
 
 export FILENAME=install_image.img
 export BUILD_DIR="/workdir/output"

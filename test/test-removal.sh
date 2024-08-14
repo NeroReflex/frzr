@@ -29,7 +29,7 @@ losetup -fP "$BUILD_IMG"
 # Find the loop device associated with the image file
 MOUNTED_DEVICE=$(losetup -a | grep "$FILENAME" | cut -d ' ' -f 1 | sed 's/://')
 
-cd /workdir/frzr && make install
+cd /workdir && make install
 
 export DISK="$MOUNTED_DEVICE"
 export SWAP_GIB=0
