@@ -4,6 +4,10 @@
 source "${BASH_SOURCE%/*}/__frzr-envars"
 
 frzr_status() {
+	echo "Error occurred in script: $0"
+    echo "Command: $BASH_COMMAND"
+    echo "Line: $LINENO"
+
 	# Output frzr status tracker using the JSON format
 	cat <<EOF
 {
