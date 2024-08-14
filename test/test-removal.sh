@@ -10,7 +10,7 @@ pacman-key --init
 pacman-key --populate archlinux
 pacman -Syu --noconfirm
 
-pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux zstd xz curl wget arch-install-scripts base-devel make
+pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux zstd xz curl wget arch-install-scripts base-devel make git
 
 # Create the frzr group
 groupadd -g 379 frzr
