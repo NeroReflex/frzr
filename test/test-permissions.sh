@@ -15,8 +15,7 @@ pacman -S --noconfirm parted btrfs-progs file libnewt dosfstools jq util-linux z
 # Create the frzr group
 groupadd -g 379 frzr
 usermod -a -G frzr $(whoami)
-useradd tester
-usermod -a -G frzr tester
+useradd -m -s /usr/bin/bash -g frzr tester
 
 cd /workdir && make install
 
