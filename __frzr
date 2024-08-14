@@ -46,11 +46,12 @@ EOF
 trap frzr_status SIGINT SIGTERM ERR
 
 write_tracker_file() {
+	local curr_status=$(frzr_status)
 	local grps=$(groups)
 	if echo "$grps" | grep -Fq "frzr"; then
-		sg frzr -c 'frzr_status > "${TRACKER_FILE_PATH}"'
+		sg frzr -c 'echo "${curr_status}" > "${TRACKER_FILE_PATH}"'
 	else
-		frzr_status > "${TRACKER_FILE_PATH}"
+		echo "${curr_status}" > "${TRACKER_FILE_PATH}"
 		sudo chown :frzr "${TRACKER_FILE_PATH}"
 	fi
 }
