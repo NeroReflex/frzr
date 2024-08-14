@@ -46,8 +46,13 @@ EOF
 trap frzr_status SIGINT SIGTERM ERR
 
 write_tracker_file() {
-	frzr_status > "${TRACKER_FILE_PATH}"
-	chmod 777 "${TRACKER_FILE_PATH}"
+	local grps=$(groups)
+	if echo "$grps" | grep -Fq "frzr"; then
+		sg frzr -c 'frzr_status > "${TRACKER_FILE_PATH}"'
+	else
+		frzr_status > "${TRACKER_FILE_PATH}"
+		sudo chown :frzr "${TRACKER_FILE_PATH}"
+	fi
 }
 
 send_data(){
