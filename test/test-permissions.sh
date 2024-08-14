@@ -24,12 +24,12 @@ cd /workdir && make install
 frzr version
 
 # run frzr version from another user
-runuser -u tester -- frzr version
+su - tester -c frzr version
 
 sudo rm /tmp/frzr.tracker
 
 # run frzr version from tester user
-runuser -u tester -- frzr version
+su - tester -c frzr version
 
 # run frzr version from current user
 frzr version
