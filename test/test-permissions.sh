@@ -25,7 +25,7 @@ frzr version
 # run frzr version from another user
 runuser -u tester -- frzr version
 
-sudo rm /tmp/frzr.tracker
+sudo rm -f /tmp/frzr.tracker
 
 # run frzr version from tester user
 runuser -u tester -- frzr version
