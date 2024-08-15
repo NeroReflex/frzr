@@ -53,8 +53,10 @@ write_tracker_file() {
 	local curr_status=$(frzr_status)
 	local grps=$(groups)
 	if echo "$grps" | grep -Fq "frzr"; then
+		rm -f "$TRACKER_FILE_PATH"
 		sg frzr -c "touch $TRACKER_FILE_PATH"
 	else
+		sudo rm -rf "${TRACKER_FILE_PATH}" 
 		sudo touch "${TRACKER_FILE_PATH}"
 		sudo chown :frzr "${TRACKER_FILE_PATH}"
 		sudo chmod g+x "${TRACKER_FILE_PATH}"
