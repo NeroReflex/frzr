@@ -55,7 +55,10 @@ arg1=$2
 arg2=$3
 arg3=$4
 
-sudo rm -f "${TRACKER_FILE_PATH}"
+# Make sure the tracker file does not exists before the proper script creates it
+if [ -f "${TRACKER_FILE_PATH}" ]; then
+	rm -f "${TRACKER_FILE_PATH}"
+fi
 
 if [ $function == "-h" ] || [ $function == "help" ]; then
 	usage
