@@ -57,6 +57,7 @@ write_tracker_file() {
 	else
 		sudo touch "${TRACKER_FILE_PATH}"
 		sudo chown :frzr "${TRACKER_FILE_PATH}"
+		sudo chmod g+x "${TRACKER_FILE_PATH}"
 	fi
 
 	echo "${curr_status}" > "${TRACKER_FILE_PATH}"
