@@ -60,7 +60,6 @@ write_tracker_file() {
 	fi
 
 	echo "${curr_status}" > "${TRACKER_FILE_PATH}"
-	chmod g+w "${TRACKER_FILE_PATH}"
 }
 
 send_data(){
