@@ -56,9 +56,12 @@ arg2=$3
 arg3=$4
 
 # Make sure the tracker file does not exists before the proper script creates it
-if [ -f "${TRACKER_FILE_PATH}" ]; then
-	rm -f "${TRACKER_FILE_PATH}"
-fi
+#if [ -f "${TRACKER_FILE_PATH}" ]; then
+#	rm -f "${TRACKER_FILE_PATH}"
+#fi
+
+# Make sure the tracker file exists
+write_tracker_file
 
 if [ $function == "-h" ] || [ $function == "help" ]; then
 	usage
